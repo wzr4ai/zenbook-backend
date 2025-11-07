@@ -1,0 +1,76 @@
+"""Schedule ORM models."""
+
+from __future__ import annotations
+
+from datetime import date, time
+from typing import TYPE_CHECKING
+
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, String, Time, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from src.core.database import Base
+from src.shared.models import TimestampMixin
+from src.shared.ulid import generate_ulid
+
+if TYPE_CHECKING:  # pragma: no cover
+    from src.modules.catalog.models import Location
+    from src.modules.users.models import Technician
+
+
+class BusinessHour(Base, TimestampMixin):
+    __tablename__ = "business_hours"
+    __table_args__ = (
+        UniqueConstraint(
+            "technician_id",
+            "location_id",
+            "day_of_week",
+            "start_time",
+            name="uq_business_hour_slot",
+        ),
+        CheckConstraint("day_of_week BETWEEN 0 AND 6", name="ck_business_hours_dow"),
+    )
+
+    rule_id: Mapped[str] = mapped_column(String(26), primary_key=True, default=generate_ulid)
+    technician_id: Mapped[str] = mapped_column(
+        String(26),
+        ForeignKey("technicians.technician_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    location_id: Mapped[str] = mapped_column(
+        String(26),
+        ForeignKey("locations.location_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_time: Mapped[time] = mapped_column(Time(timezone=True), nullable=False)
+    end_time: Mapped[time] = mapped_column(Time(timezone=True), nullable=False)
+
+    technician: Mapped["Technician"] = relationship(back_populates="business_hours")
+    location: Mapped["Location"] = relationship(back_populates="business_hours")
+
+
+class ScheduleException(Base, TimestampMixin):
+    __tablename__ = "schedule_exceptions"
+    __table_args__ = (
+        UniqueConstraint("technician_id", "location_id", "date", name="uq_schedule_exception"),
+    )
+
+    exception_id: Mapped[str] = mapped_column(String(26), primary_key=True, default=generate_ulid)
+    technician_id: Mapped[str] = mapped_column(
+        String(26),
+        ForeignKey("technicians.technician_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    location_id: Mapped[str] = mapped_column(
+        String(26),
+        ForeignKey("locations.location_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    is_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    start_time: Mapped[time | None] = mapped_column(Time(timezone=True))
+    end_time: Mapped[time | None] = mapped_column(Time(timezone=True))
+    reason: Mapped[str | None] = mapped_column(String(255))
+
+    technician: Mapped["Technician"] = relationship(back_populates="exceptions")
+    location: Mapped["Location"] = relationship(back_populates="exceptions")

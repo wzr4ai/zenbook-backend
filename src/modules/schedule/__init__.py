@@ -1,0 +1,1 @@
+"""Schedule and availability module."""

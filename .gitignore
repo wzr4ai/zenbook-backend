@@ -1,0 +1,36 @@
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+*.env
+.env.*
+!.env.example
+.DS_Store
+
+# Node / UniApp / Vue
+node_modules/
+dist/
+unpackage/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.idea/
+.vscode/
+
+# Tool caches & reports
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.uv-cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local databases / logs
+*.sqlite3
+*.db
+*.log
