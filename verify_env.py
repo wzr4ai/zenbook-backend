@@ -1,36 +1,60 @@
 import asyncio
 import os
+
 from dotenv import load_dotenv
-import sqlalchemy
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy import text
 import redis.asyncio as redis
+from sqlalchemy import text
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from src.core.database import resolve_async_database_url
 
 # 1. 加载 .env 文件
 load_dotenv()
 
-async def verify_postgres():
+DB_LABELS = {
+    "postgresql": "PostgreSQL",
+    "mysql": "MySQL",
+    "sqlite": "SQLite (测试)",
+}
+
+HEALTH_QUERIES = {
+    "postgresql": "SELECT version();",
+    "mysql": "SELECT VERSION();",
+}
+
+
+async def verify_database():
     print("-" * 30)
-    print("🔍 正在验证 PostgreSQL 连接...")
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         print("❌ 错误: 未找到 DATABASE_URL 环境变量")
         return False
 
-    print(f"ℹ️  DATABASE_URL: {db_url.split('@')[-1]}") # 只显示主机部分，隐藏密码
+    try:
+        async_url = resolve_async_database_url(db_url)
+        url = make_url(async_url)
+    except Exception as exc:  # noqa: BLE001 - surface clear setup errors
+        print(f"❌ 数据库配置不支持: {exc}")
+        return False
+
+    backend = url.get_backend_name()
+    label = DB_LABELS.get(backend, backend)
+    print(f"🔍 正在验证 {label} 连接...")
+    print(f"ℹ️  DSN: {url.render_as_string(hide_password=True)}")
+
+    query = HEALTH_QUERIES.get(backend, "SELECT 1")
 
     try:
-        # 创建异步引擎 (与实际项目相同的连接方式)
-        engine = create_async_engine(db_url, echo=False)
+        engine = create_async_engine(async_url, echo=False)
         async with engine.connect() as conn:
-            # 执行一个简单的查询
-            result = await conn.execute(text("SELECT version();"))
+            result = await conn.execute(text(query))
             version = result.scalar()
-            print(f"✅ PostgreSQL 连接成功! 版本: {version}")
+            print(f"✅ {label} 连接成功! 返回: {version}")
         await engine.dispose()
         return True
-    except Exception as e:
-        print(f"❌ PostgreSQL 连接失败: {e}")
+    except Exception as e:  # noqa: BLE001 - surface connection failure
+        print(f"❌ {label} 连接失败: {e}")
         return False
 
 async def verify_redis():
@@ -57,11 +81,11 @@ async def verify_redis():
 async def main():
     print("🚀 开始环境配置验证...")
     
-    pg_ok = await verify_postgres()
+    db_ok = await verify_database()
     redis_ok = await verify_redis()
 
     print("-" * 30)
-    if pg_ok and redis_ok:
+    if db_ok and redis_ok:
         print("🎉 恭喜! 所有核心服务连接配置正确。")
     else:
         print("⚠️  警告: 存在连接问题，请检查 .env 文件和 Docker 容器状态。")

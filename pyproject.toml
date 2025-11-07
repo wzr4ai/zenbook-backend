@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.17.1",
     "asyncpg>=0.30.0",
+    "asyncmy>=0.2.9",
     "aiosqlite>=0.20.0",
     "fastapi>=0.121.0",
     "multipart>=1.3.0",
@@ -23,6 +24,7 @@ dependencies = [
 dev = [
     "alembic>=1.17.1",
     "asyncpg>=0.30.0",
+    "asyncmy>=0.2.9",
     "httpx>=0.28.1",
     "mypy>=1.18.2",
     "pytest>=8.4.2",

@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.append(str(SRC_PATH))
-from src.core.database import Base
+from src.core.database import Base, resolve_async_database_url
 from src.modules.appointments import models as appointment_models  # noqa: F401
 from src.modules.catalog import models as catalog_models  # noqa: F401
 from src.modules.schedule import models as schedule_models  # noqa: F401
@@ -30,7 +30,7 @@ config = context.config
 # 核心修改：用环境变量覆盖 alembic.ini 中的配置
 database_url = os.getenv("DATABASE_URL")
 if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+    config.set_main_option("sqlalchemy.url", resolve_async_database_url(database_url))
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
