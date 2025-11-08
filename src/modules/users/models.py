@@ -8,7 +8,7 @@ from sqlalchemy import Boolean, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
-from src.shared.enums import UserRole
+from src.shared.enums import UserRole, enum_values
 from src.shared.models import TimestampMixin
 from src.shared.ulid import generate_ulid
 
@@ -27,7 +27,16 @@ class User(Base, TimestampMixin):
         default=generate_ulid,
     )
     wechat_openid: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False, default=UserRole.CUSTOMER)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(
+            UserRole,
+            values_callable=enum_values,
+            validate_strings=True,
+            name="userrole",
+        ),
+        nullable=False,
+        default=UserRole.CUSTOMER,
+    )
     display_name: Mapped[str | None] = mapped_column(String(100))
     phone_number: Mapped[str | None] = mapped_column(String(32))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

@@ -9,7 +9,7 @@ from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Numer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
-from src.shared.enums import AppointmentStatus, UserRole
+from src.shared.enums import AppointmentStatus, UserRole, enum_values
 from src.shared.models import TimestampMixin
 from src.shared.ulid import generate_ulid
 
@@ -48,8 +48,24 @@ class Appointment(Base, TimestampMixin):
     )
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    status: Mapped[AppointmentStatus] = mapped_column(Enum(AppointmentStatus), default=AppointmentStatus.SCHEDULED)
-    booked_by_role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
+    status: Mapped[AppointmentStatus] = mapped_column(
+        Enum(
+            AppointmentStatus,
+            values_callable=enum_values,
+            validate_strings=True,
+            name="appointmentstatus",
+        ),
+        default=AppointmentStatus.SCHEDULED,
+    )
+    booked_by_role: Mapped[UserRole] = mapped_column(
+        Enum(
+            UserRole,
+            values_callable=enum_values,
+            validate_strings=True,
+            name="userrole",
+        ),
+        nullable=False,
+    )
     price_at_booking: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
 
