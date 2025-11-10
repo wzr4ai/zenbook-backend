@@ -165,3 +165,79 @@ async def test_father_quota_blocks_customer_but_not_admin(monkeypatch, db_sessio
         db_session,
     )
     assert len(admin_slots) >= 1
+
+
+@pytest.mark.asyncio
+async def test_custom_quota_limit_enforced_without_global_flag(db_session):
+    tz = ZoneInfo("Asia/Shanghai")
+    technician, location, service, offering = await _seed_common_catalog(db_session)
+    technician.restricted_by_quota = False
+    technician.daily_quota_limit = 1
+    await db_session.commit()
+
+    user = User(user_id=generate_ulid(), wechat_openid="wx-custom", role=UserRole.CUSTOMER, is_active=True)
+    patient = Patient(patient_id=generate_ulid(), managed_by_user_id=user.user_id, full_name="Quota Test")
+    early_appt = Appointment(
+        appointment_id=generate_ulid(),
+        patient_id=patient.patient_id,
+        booked_by_user_id=user.user_id,
+        offering_id=offering.offering_id,
+        technician_id=technician.technician_id,
+        start_time=datetime(2024, 5, 20, 9, 0, tzinfo=tz),
+        end_time=datetime(2024, 5, 20, 10, 0, tzinfo=tz),
+        status=AppointmentStatus.SCHEDULED,
+        booked_by_role=UserRole.CUSTOMER,
+        price_at_booking=Decimal("128.00"),
+    )
+    db_session.add_all([user, patient, early_appt])
+    await db_session.commit()
+
+    request = AvailabilityRequest(
+        target_date=date(2024, 5, 20),
+        technician_id=technician.technician_id,
+        service_id=service.service_id,
+        location_id=location.location_id,
+        requester_role=UserRole.CUSTOMER,
+    )
+    slots = await get_availability(request, db_session)
+    assert slots == []
+
+
+@pytest.mark.asyncio
+async def test_zero_quota_disables_restriction(monkeypatch, db_session):
+    tz = ZoneInfo("Asia/Shanghai")
+    technician, location, service, offering = await _seed_common_catalog(db_session)
+    technician.restricted_by_quota = True
+    technician.daily_quota_limit = 0
+    technician.weekly_quota_limit = 0
+    await db_session.commit()
+
+    user = User(user_id=generate_ulid(), wechat_openid="wx-zero", role=UserRole.CUSTOMER, is_active=True)
+    patient = Patient(patient_id=generate_ulid(), managed_by_user_id=user.user_id, full_name="Zero Limit")
+    appt = Appointment(
+        appointment_id=generate_ulid(),
+        patient_id=patient.patient_id,
+        booked_by_user_id=user.user_id,
+        offering_id=offering.offering_id,
+        technician_id=technician.technician_id,
+        start_time=datetime(2024, 5, 20, 9, 0, tzinfo=tz),
+        end_time=datetime(2024, 5, 20, 10, 0, tzinfo=tz),
+        status=AppointmentStatus.SCHEDULED,
+        booked_by_role=UserRole.CUSTOMER,
+        price_at_booking=Decimal("128.00"),
+    )
+    db_session.add_all([user, patient, appt])
+    await db_session.commit()
+
+    monkeypatch.setattr(settings, "father_customer_daily_quota", 1)
+    monkeypatch.setattr(settings, "father_customer_weekly_quota", 1)
+
+    request = AvailabilityRequest(
+        target_date=date(2024, 5, 20),
+        technician_id=technician.technician_id,
+        service_id=service.service_id,
+        location_id=location.location_id,
+        requester_role=UserRole.CUSTOMER,
+    )
+    slots = await get_availability(request, db_session)
+    assert len(slots) >= 1

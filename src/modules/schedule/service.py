@@ -40,8 +40,11 @@ async def get_availability(request: AvailabilityRequest, db: AsyncSession) -> li
     day_start = datetime.combine(request.target_date, time.min, tz)
     day_end = day_start + timedelta(days=1)
 
-    if technician.restricted_by_quota and request.requester_role == UserRole.CUSTOMER:
-        if await _quota_exceeded(technician.technician_id, day_start, day_end, db):
+    daily_quota_limit, weekly_quota_limit = _resolve_quota_limits(technician)
+    if request.requester_role == UserRole.CUSTOMER and (daily_quota_limit > 0 or weekly_quota_limit > 0):
+        if await _quota_exceeded(
+            technician.technician_id, day_start, day_end, daily_quota_limit, weekly_quota_limit, db
+        ):
             return []
 
     duration = timedelta(minutes=offering.duration_minutes)
@@ -59,15 +62,27 @@ async def get_availability(request: AvailabilityRequest, db: AsyncSession) -> li
     return [AvailabilitySlot(start=start, end=end) for start, end in slots]
 
 
-async def _quota_exceeded(technician_id: str, day_start: datetime, day_end: datetime, db: AsyncSession) -> bool:
-    day_count = await _count_customer_appointments(technician_id, day_start, day_end, db)
-    if day_count >= settings.father_customer_daily_quota:
-        return True
+async def _quota_exceeded(
+    technician_id: str,
+    day_start: datetime,
+    day_end: datetime,
+    daily_quota_limit: int,
+    weekly_quota_limit: int,
+    db: AsyncSession,
+) -> bool:
+    if daily_quota_limit > 0:
+        day_count = await _count_customer_appointments(technician_id, day_start, day_end, db)
+        if day_count >= daily_quota_limit:
+            return True
 
-    week_start = day_start - timedelta(days=day_start.weekday())
-    week_end = week_start + timedelta(days=7)
-    week_count = await _count_customer_appointments(technician_id, week_start, week_end, db)
-    return week_count >= settings.father_customer_weekly_quota
+    if weekly_quota_limit > 0:
+        week_start = day_start - timedelta(days=day_start.weekday())
+        week_end = week_start + timedelta(days=7)
+        week_count = await _count_customer_appointments(technician_id, week_start, week_end, db)
+        if week_count >= weekly_quota_limit:
+            return True
+
+    return False
 
 
 async def _count_customer_appointments(
@@ -204,6 +219,20 @@ async def _get_appointments_for_day(
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+def _resolve_quota_limits(technician: Technician) -> tuple[int, int]:
+    base_daily = settings.father_customer_daily_quota if technician.restricted_by_quota else 0
+    base_weekly = settings.father_customer_weekly_quota if technician.restricted_by_quota else 0
+    daily_limit = _normalize_quota(technician.daily_quota_limit, base_daily)
+    weekly_limit = _normalize_quota(technician.weekly_quota_limit, base_weekly)
+    return daily_limit, weekly_limit
+
+
+def _normalize_quota(explicit: int | None, fallback: int) -> int:
+    if explicit is None:
+        return max(0, fallback)
+    return max(0, explicit)
 
 
 def _normalize_timezone(value: datetime, target_tz: tzinfo | None) -> datetime:
