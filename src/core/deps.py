@@ -56,7 +56,7 @@ async def get_optional_user(
 
 def require_role(*roles: UserRole):
     async def dependency(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in roles:
+        if current_user.role not in roles and current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
         return current_user
 
