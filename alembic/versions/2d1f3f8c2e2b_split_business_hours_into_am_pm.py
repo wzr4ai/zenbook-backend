@@ -46,6 +46,14 @@ def _create_unique_constraint_if_missing(bind, name: str, table: str, columns: t
     op.create_unique_constraint(name, table, columns)
 
 
+def _ensure_index(bind, table: str, name: str, columns: tuple[str, ...]) -> None:
+    inspector = sa.inspect(bind)
+    existing = {idx["name"] for idx in inspector.get_indexes(table)}
+    if name in existing:
+        return
+    op.create_index(name, table, columns)
+
+
 def upgrade() -> None:
     bind = op.get_bind()
 
@@ -74,6 +82,8 @@ def upgrade() -> None:
     )
 
     if legacy_columns_present:
+        _ensure_index(bind, "business_hours", "ix_business_hours_technician_id", ("technician_id",))
+        _ensure_index(bind, "business_hours", "ix_business_hours_location_id", ("location_id",))
         rows = list(
             bind.execute(
                 sa.select(
