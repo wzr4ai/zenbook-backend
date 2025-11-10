@@ -1,5 +1,7 @@
 """Admin schedule management routes."""
 
+from datetime import time
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +22,32 @@ from src.modules.users.models import User
 router = APIRouter(prefix="/api/v1/admin/schedule", tags=["admin-schedule"])
 
 
+def _time_to_minutes(value: time) -> int:
+    return value.hour * 60 + value.minute
+
+
+def _overlaps(start_a: time, end_a: time, start_b: time, end_b: time) -> bool:
+    return _time_to_minutes(start_a) < _time_to_minutes(end_b) and _time_to_minutes(start_b) < _time_to_minutes(end_a)
+
+
+async def _ensure_no_conflict(db: AsyncSession, item: BusinessHourCreate) -> None:
+    if item.start_time >= item.end_time:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start_time must be before end_time")
+
+    existing_stmt = select(BusinessHour).where(
+        BusinessHour.technician_id == item.technician_id,
+        BusinessHour.location_id == item.location_id,
+        BusinessHour.day_of_week == item.day_of_week,
+    )
+    result = await db.execute(existing_stmt)
+    for record in result.scalars():
+        if _overlaps(record.start_time, record.end_time, item.start_time, item.end_time):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Business hour conflicts with an existing slot",
+            )
+
+
 async def _get_schedule_entity(db: AsyncSession, model, column, identifier: str, not_found: str):
     stmt = select(model).where(column == identifier)
     result = await db.execute(stmt)
@@ -37,6 +65,7 @@ async def create_business_hours(
 ) -> list[BusinessHourPublic]:
     records: list[BusinessHour] = []
     for item in payload:
+        await _ensure_no_conflict(db, item)
         record = BusinessHour(**item.model_dump())
         db.add(record)
         records.append(record)
