@@ -99,8 +99,8 @@ async def test_admin_schedule_crud(admin_client):
             "technician_id": technician_id,
             "location_id": location_id,
             "day_of_week": 1,
-            "start_time": "09:00:00",
-            "end_time": "12:00:00",
+            "start_time_am": "09:00:00",
+            "end_time_am": "12:00:00",
         }
     ]
     create_resp = await client.post("/api/v1/admin/schedule/business-hours", json=hours_payload)
@@ -109,10 +109,12 @@ async def test_admin_schedule_crud(admin_client):
 
     update_resp = await client.put(
         f"/api/v1/admin/schedule/business-hours/{rule_id}",
-        json={"start_time": "10:00:00"},
+        json={"start_time_pm": "14:00:00", "end_time_pm": "18:00:00"},
     )
     update_resp.raise_for_status()
-    assert update_resp.json()["start_time"] == "10:00:00"
+    body = update_resp.json()
+    assert body["start_time_pm"] == "14:00:00"
+    assert body["end_time_pm"] == "18:00:00"
 
     exception_resp = await client.post(
         "/api/v1/admin/schedule/exceptions",

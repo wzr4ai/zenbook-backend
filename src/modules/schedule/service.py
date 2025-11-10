@@ -135,7 +135,7 @@ async def _get_business_hours(request: AvailabilityRequest, db: AsyncSession) ->
             BusinessHour.location_id == request.location_id,
             BusinessHour.day_of_week == request.target_date.weekday(),
         )
-        .order_by(BusinessHour.start_time)
+        .order_by(BusinessHour.day_of_week)
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
@@ -166,9 +166,14 @@ def _build_slots_from_rules(
 ) -> list[tuple[datetime, datetime]]:
     slots: list[tuple[datetime, datetime]] = []
     for rule in rules:
-        start = _combine(target_date, rule.start_time, tz)
-        end = _combine(target_date, rule.end_time, tz)
-        slots.extend(_generate_slots(start, end, duration))
+        if rule.start_time_am and rule.end_time_am:
+            start_am = _combine(target_date, rule.start_time_am, tz)
+            end_am = _combine(target_date, rule.end_time_am, tz)
+            slots.extend(_generate_slots(start_am, end_am, duration))
+        if rule.start_time_pm and rule.end_time_pm:
+            start_pm = _combine(target_date, rule.start_time_pm, tz)
+            end_pm = _combine(target_date, rule.end_time_pm, tz)
+            slots.extend(_generate_slots(start_pm, end_pm, duration))
     return slots
 
 

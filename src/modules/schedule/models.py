@@ -20,13 +20,7 @@ if TYPE_CHECKING:  # pragma: no cover
 class BusinessHour(Base, TimestampMixin):
     __tablename__ = "business_hours"
     __table_args__ = (
-        UniqueConstraint(
-            "technician_id",
-            "location_id",
-            "day_of_week",
-            "start_time",
-            name="uq_business_hour_slot",
-        ),
+        UniqueConstraint("technician_id", "location_id", "day_of_week", name="uq_business_hour_day"),
         CheckConstraint("day_of_week BETWEEN 0 AND 6", name="ck_business_hours_dow"),
     )
 
@@ -42,8 +36,10 @@ class BusinessHour(Base, TimestampMixin):
         nullable=False,
     )
     day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)
-    start_time: Mapped[time] = mapped_column(Time(timezone=True), nullable=False)
-    end_time: Mapped[time] = mapped_column(Time(timezone=True), nullable=False)
+    start_time_am: Mapped[time | None] = mapped_column(Time(timezone=True))
+    end_time_am: Mapped[time | None] = mapped_column(Time(timezone=True))
+    start_time_pm: Mapped[time | None] = mapped_column(Time(timezone=True))
+    end_time_pm: Mapped[time | None] = mapped_column(Time(timezone=True))
 
     technician: Mapped["Technician"] = relationship(back_populates="business_hours")
     location: Mapped["Location"] = relationship(back_populates="business_hours")

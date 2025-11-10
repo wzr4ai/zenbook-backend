@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import select
 
 from src.core.config import settings
 from src.modules.appointments.models import Appointment
@@ -41,8 +42,10 @@ async def _seed_common_catalog(db_session):
         technician_id=technician.technician_id,
         location_id=location.location_id,
         day_of_week=0,
-        start_time=time(9, 0),
-        end_time=time(12, 0),
+        start_time_am=time(9, 0),
+        end_time_am=time(12, 0),
+        start_time_pm=None,
+        end_time_pm=None,
     )
     db_session.add_all([technician, location, service, offering, business_hour])
     await db_session.commit()
@@ -210,15 +213,17 @@ async def test_afternoon_quota_only_blocks_afternoon(db_session):
     technician.afternoon_quota_limit = 1
     await db_session.commit()
 
-    afternoon_hour = BusinessHour(
-        rule_id=generate_ulid(),
-        technician_id=technician.technician_id,
-        location_id=location.location_id,
-        day_of_week=0,
-        start_time=time(13, 0),
-        end_time=time(17, 0),
-    )
-    db_session.add(afternoon_hour)
+    existing_hour = (
+        await db_session.execute(
+            select(BusinessHour).where(
+                BusinessHour.technician_id == technician.technician_id,
+                BusinessHour.location_id == location.location_id,
+                BusinessHour.day_of_week == 0,
+            )
+        )
+    ).scalar_one()
+    existing_hour.start_time_pm = time(13, 0)
+    existing_hour.end_time_pm = time(17, 0)
     await db_session.commit()
 
     user = User(user_id=generate_ulid(), wechat_openid="wx-afternoon", role=UserRole.CUSTOMER, is_active=True)

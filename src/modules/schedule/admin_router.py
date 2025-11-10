@@ -1,7 +1,5 @@
 """Admin schedule management routes."""
 
-from datetime import time
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,30 +20,22 @@ from src.modules.users.models import User
 router = APIRouter(prefix="/api/v1/admin/schedule", tags=["admin-schedule"])
 
 
-def _time_to_minutes(value: time) -> int:
-    return value.hour * 60 + value.minute
-
-
-def _overlaps(start_a: time, end_a: time, start_b: time, end_b: time) -> bool:
-    return _time_to_minutes(start_a) < _time_to_minutes(end_b) and _time_to_minutes(start_b) < _time_to_minutes(end_a)
-
-
-async def _ensure_no_conflict(db: AsyncSession, item: BusinessHourCreate) -> None:
-    if item.start_time >= item.end_time:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start_time must be before end_time")
-
-    existing_stmt = select(BusinessHour).where(
+async def _ensure_unique_day(db: AsyncSession, item: BusinessHourCreate) -> None:
+    stmt = select(BusinessHour).where(
         BusinessHour.technician_id == item.technician_id,
         BusinessHour.location_id == item.location_id,
         BusinessHour.day_of_week == item.day_of_week,
     )
-    result = await db.execute(existing_stmt)
-    for record in result.scalars():
-        if _overlaps(record.start_time, record.end_time, item.start_time, item.end_time):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Business hour conflicts with an existing slot",
-            )
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Business hour already defined for this day")
+
+
+def _validate_record(record: BusinessHour) -> None:
+    has_am = bool(record.start_time_am and record.end_time_am)
+    has_pm = bool(record.start_time_pm and record.end_time_pm)
+    if not (has_am or has_pm):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one slot must be configured")
 
 
 async def _get_schedule_entity(db: AsyncSession, model, column, identifier: str, not_found: str):
@@ -65,8 +55,9 @@ async def create_business_hours(
 ) -> list[BusinessHourPublic]:
     records: list[BusinessHour] = []
     for item in payload:
-        await _ensure_no_conflict(db, item)
+        await _ensure_unique_day(db, item)
         record = BusinessHour(**item.model_dump())
+        _validate_record(record)
         db.add(record)
         records.append(record)
     await db.commit()
@@ -92,8 +83,10 @@ async def update_business_hour(
     db: AsyncSession = Depends(get_db),
 ) -> BusinessHourPublic:
     rule = await _get_schedule_entity(db, BusinessHour, BusinessHour.rule_id, rule_id, "Business hour not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
         setattr(rule, field, value)
+    _validate_record(rule)
     await db.commit()
     await db.refresh(rule)
     return BusinessHourPublic.model_validate(rule)
