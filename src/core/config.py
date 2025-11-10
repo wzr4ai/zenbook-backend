@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     wechat_timeout_seconds: float = Field(5.0, alias="WECHAT_TIMEOUT_SECONDS")
 
     default_timezone: str = Field("Asia/Shanghai", alias="DEFAULT_TIMEZONE")
-    father_customer_daily_quota: int = Field(4, alias="FATHER_CUSTOMER_DAILY_QUOTA")
-    father_customer_weekly_quota: int = Field(12, alias="FATHER_CUSTOMER_WEEKLY_QUOTA")
+    father_customer_morning_quota: int = Field(2, alias="FATHER_CUSTOMER_MORNING_QUOTA")
+    father_customer_afternoon_quota: int = Field(2, alias="FATHER_CUSTOMER_AFTERNOON_QUOTA")
 
 
 @lru_cache(1)

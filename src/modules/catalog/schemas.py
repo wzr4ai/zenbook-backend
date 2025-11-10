@@ -66,8 +66,8 @@ class TechnicianPublic(BaseModel):
     avatar_url: str | None = None
     is_active: bool
     restricted_by_quota: bool
-    daily_quota_limit: int | None = Field(default=None, ge=0)
-    weekly_quota_limit: int | None = Field(default=None, ge=0)
+    morning_quota_limit: int | None = Field(default=None, ge=0)
+    afternoon_quota_limit: int | None = Field(default=None, ge=0)
 
 
 class TechnicianCreate(BaseModel):
@@ -77,8 +77,8 @@ class TechnicianCreate(BaseModel):
     user_id: str | None = None
     is_active: bool = True
     restricted_by_quota: bool = False
-    daily_quota_limit: int | None = Field(default=None, ge=0)
-    weekly_quota_limit: int | None = Field(default=None, ge=0)
+    morning_quota_limit: int | None = Field(default=None, ge=0)
+    afternoon_quota_limit: int | None = Field(default=None, ge=0)
 
 
 class TechnicianUpdate(BaseModel):
@@ -88,8 +88,8 @@ class TechnicianUpdate(BaseModel):
     user_id: str | None = None
     is_active: bool | None = None
     restricted_by_quota: bool | None = None
-    daily_quota_limit: int | None = Field(default=None, ge=0)
-    weekly_quota_limit: int | None = Field(default=None, ge=0)
+    morning_quota_limit: int | None = Field(default=None, ge=0)
+    afternoon_quota_limit: int | None = Field(default=None, ge=0)
 
 
 class OfferingPublic(BaseModel):

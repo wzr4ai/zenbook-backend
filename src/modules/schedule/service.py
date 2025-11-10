@@ -40,12 +40,12 @@ async def get_availability(request: AvailabilityRequest, db: AsyncSession) -> li
     day_start = datetime.combine(request.target_date, time.min, tz)
     day_end = day_start + timedelta(days=1)
 
-    daily_quota_limit, weekly_quota_limit = _resolve_quota_limits(technician)
-    if request.requester_role == UserRole.CUSTOMER and (daily_quota_limit > 0 or weekly_quota_limit > 0):
-        if await _quota_exceeded(
-            technician.technician_id, day_start, day_end, daily_quota_limit, weekly_quota_limit, db
-        ):
-            return []
+    morning_quota_limit, afternoon_quota_limit = _resolve_quota_limits(technician)
+    blocked_morning = blocked_afternoon = False
+    if request.requester_role == UserRole.CUSTOMER and (morning_quota_limit > 0 or afternoon_quota_limit > 0):
+        blocked_morning, blocked_afternoon = await _quota_overages(
+            technician.technician_id, day_start, day_end, morning_quota_limit, afternoon_quota_limit, db
+        )
 
     duration = timedelta(minutes=offering.duration_minutes)
     business_hours = await _get_business_hours(request, db)
@@ -53,6 +53,13 @@ async def get_availability(request: AvailabilityRequest, db: AsyncSession) -> li
 
     slots = _build_slots_from_rules(business_hours, request.target_date, duration, tz)
     slots = _apply_exception(slots, exception, request.target_date, duration, tz)
+
+    if blocked_morning or blocked_afternoon:
+        noon = day_start.replace(hour=12, minute=0, second=0, microsecond=0)
+        if blocked_morning:
+            slots = [slot for slot in slots if slot[0] >= noon]
+        if blocked_afternoon:
+            slots = [slot for slot in slots if slot[0] < noon]
 
     if not slots:
         return []
@@ -62,27 +69,28 @@ async def get_availability(request: AvailabilityRequest, db: AsyncSession) -> li
     return [AvailabilitySlot(start=start, end=end) for start, end in slots]
 
 
-async def _quota_exceeded(
+async def _quota_overages(
     technician_id: str,
     day_start: datetime,
     day_end: datetime,
-    daily_quota_limit: int,
-    weekly_quota_limit: int,
+    morning_quota_limit: int,
+    afternoon_quota_limit: int,
     db: AsyncSession,
-) -> bool:
-    if daily_quota_limit > 0:
-        day_count = await _count_customer_appointments(technician_id, day_start, day_end, db)
-        if day_count >= daily_quota_limit:
-            return True
+) -> tuple[bool, bool]:
+    morning_end = day_start.replace(hour=12, minute=0, second=0, microsecond=0)
 
-    if weekly_quota_limit > 0:
-        week_start = day_start - timedelta(days=day_start.weekday())
-        week_end = week_start + timedelta(days=7)
-        week_count = await _count_customer_appointments(technician_id, week_start, week_end, db)
-        if week_count >= weekly_quota_limit:
-            return True
+    morning_full = False
+    afternoon_full = False
 
-    return False
+    if morning_quota_limit > 0:
+        morning_count = await _count_customer_appointments(technician_id, day_start, morning_end, db)
+        morning_full = morning_count >= morning_quota_limit
+
+    if afternoon_quota_limit > 0:
+        afternoon_count = await _count_customer_appointments(technician_id, morning_end, day_end, db)
+        afternoon_full = afternoon_count >= afternoon_quota_limit
+
+    return morning_full, afternoon_full
 
 
 async def _count_customer_appointments(
@@ -222,11 +230,11 @@ async def _get_appointments_for_day(
 
 
 def _resolve_quota_limits(technician: Technician) -> tuple[int, int]:
-    base_daily = settings.father_customer_daily_quota if technician.restricted_by_quota else 0
-    base_weekly = settings.father_customer_weekly_quota if technician.restricted_by_quota else 0
-    daily_limit = _normalize_quota(technician.daily_quota_limit, base_daily)
-    weekly_limit = _normalize_quota(technician.weekly_quota_limit, base_weekly)
-    return daily_limit, weekly_limit
+    base_morning = settings.father_customer_morning_quota if technician.restricted_by_quota else 0
+    base_afternoon = settings.father_customer_afternoon_quota if technician.restricted_by_quota else 0
+    morning_limit = _normalize_quota(technician.morning_quota_limit, base_morning)
+    afternoon_limit = _normalize_quota(technician.afternoon_quota_limit, base_afternoon)
+    return morning_limit, afternoon_limit
 
 
 def _normalize_quota(explicit: int | None, fallback: int) -> int:

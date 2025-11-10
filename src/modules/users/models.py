@@ -77,8 +77,8 @@ class Technician(Base, TimestampMixin):
     avatar_url: Mapped[str | None] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     restricted_by_quota: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    daily_quota_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    weekly_quota_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    morning_quota_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    afternoon_quota_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user: Mapped[User | None] = relationship(back_populates="technician_profile")
     offerings: Mapped[list[Offering]] = relationship(back_populates="technician")
