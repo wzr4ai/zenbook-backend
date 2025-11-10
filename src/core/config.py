@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expires_in_minutes: int = Field(60 * 24, alias="JWT_EXPIRES_IN")
 
+    wechat_appid: str = Field(..., alias="WECHAT_APPID")
+    wechat_secret: str = Field(..., alias="WECHAT_SECRET")
+    wechat_api_base: str = Field("https://api.weixin.qq.com", alias="WECHAT_API_BASE")
+    wechat_timeout_seconds: float = Field(5.0, alias="WECHAT_TIMEOUT_SECONDS")
+
     default_timezone: str = Field("Asia/Shanghai", alias="DEFAULT_TIMEZONE")
     father_customer_daily_quota: int = Field(4, alias="FATHER_CUSTOMER_DAILY_QUOTA")
     father_customer_weekly_quota: int = Field(12, alias="FATHER_CUSTOMER_WEEKLY_QUOTA")
