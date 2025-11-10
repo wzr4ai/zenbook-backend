@@ -1,5 +1,7 @@
 """Admin schedule management routes."""
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,15 +22,23 @@ from src.modules.users.models import User
 router = APIRouter(prefix="/api/v1/admin/schedule", tags=["admin-schedule"])
 
 
-async def _ensure_unique_day(db: AsyncSession, item: BusinessHourCreate) -> None:
+async def _ensure_unique_date(
+    db: AsyncSession,
+    technician_id: str,
+    location_id: str,
+    rule_date: date,
+    exclude_rule_id: str | None = None,
+) -> None:
     stmt = select(BusinessHour).where(
-        BusinessHour.technician_id == item.technician_id,
-        BusinessHour.location_id == item.location_id,
-        BusinessHour.day_of_week == item.day_of_week,
+        BusinessHour.technician_id == technician_id,
+        BusinessHour.location_id == location_id,
+        BusinessHour.rule_date == rule_date,
     )
+    if exclude_rule_id:
+        stmt = stmt.where(BusinessHour.rule_id != exclude_rule_id)
     result = await db.execute(stmt)
     if result.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Business hour already defined for this day")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Business hour already defined for this date")
 
 
 def _validate_record(record: BusinessHour) -> None:
@@ -36,6 +46,8 @@ def _validate_record(record: BusinessHour) -> None:
     has_pm = bool(record.start_time_pm and record.end_time_pm)
     if not (has_am or has_pm):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one slot must be configured")
+    if record.rule_date is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="rule_date is required")
 
 
 async def _get_schedule_entity(db: AsyncSession, model, column, identifier: str, not_found: str):
@@ -55,8 +67,10 @@ async def create_business_hours(
 ) -> list[BusinessHourPublic]:
     records: list[BusinessHour] = []
     for item in payload:
-        await _ensure_unique_day(db, item)
-        record = BusinessHour(**item.model_dump())
+        await _ensure_unique_date(db, item.technician_id, item.location_id, item.rule_date)
+        data = item.model_dump()
+        data["day_of_week"] = item.rule_date.weekday()
+        record = BusinessHour(**data)
         _validate_record(record)
         db.add(record)
         records.append(record)
@@ -84,6 +98,15 @@ async def update_business_hour(
 ) -> BusinessHourPublic:
     rule = await _get_schedule_entity(db, BusinessHour, BusinessHour.rule_id, rule_id, "Business hour not found")
     update_data = payload.model_dump(exclude_unset=True)
+    if "rule_date" in update_data and update_data["rule_date"] is not None:
+        await _ensure_unique_date(
+            db,
+            rule.technician_id,
+            rule.location_id,
+            update_data["rule_date"],
+            exclude_rule_id=rule.rule_id,
+        )
+        update_data["day_of_week"] = update_data["rule_date"].weekday()
     for field, value in update_data.items():
         setattr(rule, field, value)
     _validate_record(rule)

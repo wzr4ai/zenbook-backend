@@ -17,6 +17,8 @@ from src.modules.users.models import Patient, Technician, User
 from src.shared.enums import AppointmentStatus, UserRole
 from src.shared.ulid import generate_ulid
 
+BASE_RULE_DATE = date(2024, 5, 20)
+
 
 async def _seed_common_catalog(db_session):
     technician = Technician(technician_id=generate_ulid(), display_name="Master Li", restricted_by_quota=False, is_active=True)
@@ -41,7 +43,8 @@ async def _seed_common_catalog(db_session):
         rule_id=generate_ulid(),
         technician_id=technician.technician_id,
         location_id=location.location_id,
-        day_of_week=0,
+        day_of_week=BASE_RULE_DATE.weekday(),
+        rule_date=BASE_RULE_DATE,
         start_time_am=time(9, 0),
         end_time_am=time(12, 0),
         start_time_pm=None,
@@ -68,8 +71,8 @@ async def test_availability_excludes_conflicting_appointments(db_session):
         booked_by_user_id=user.user_id,
         offering_id=offering.offering_id,
         technician_id=technician.technician_id,
-        start_time=datetime(2024, 5, 20, 9, 0, tzinfo=tz),
-        end_time=datetime(2024, 5, 20, 10, 0, tzinfo=tz),
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+        end_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 10, 0, tzinfo=tz),
         status=AppointmentStatus.SCHEDULED,
         booked_by_role=UserRole.CUSTOMER,
         price_at_booking=Decimal("128.00"),
@@ -78,7 +81,7 @@ async def test_availability_excludes_conflicting_appointments(db_session):
     await db_session.commit()
 
     request = AvailabilityRequest(
-        target_date=date(2024, 5, 20),
+        target_date=BASE_RULE_DATE,
         technician_id=technician.technician_id,
         service_id=service.service_id,
         location_id=location.location_id,
@@ -106,7 +109,7 @@ async def test_customer_booking_requires_free_slot(db_session):
     payload = AppointmentCreate(
         offering_id=offering.offering_id,
         patient_id=patient.patient_id,
-        start_time=datetime(2024, 5, 20, 9, 0, tzinfo=tz),
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
     )
 
     created = await service_layer.create_customer(payload, user)
@@ -135,8 +138,8 @@ async def test_father_quota_blocks_customer_but_not_admin(monkeypatch, db_sessio
         booked_by_user_id=user.user_id,
         offering_id=offering.offering_id,
         technician_id=technician.technician_id,
-        start_time=datetime(2024, 5, 20, 9, 0, tzinfo=tz),
-        end_time=datetime(2024, 5, 20, 10, 0, tzinfo=tz),
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+        end_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 10, 0, tzinfo=tz),
         status=AppointmentStatus.SCHEDULED,
         booked_by_role=UserRole.CUSTOMER,
         price_at_booking=Decimal("128.00"),
@@ -148,7 +151,7 @@ async def test_father_quota_blocks_customer_but_not_admin(monkeypatch, db_sessio
     monkeypatch.setattr(settings, "father_customer_afternoon_quota", 1)
 
     base_request = AvailabilityRequest(
-        target_date=date(2024, 5, 20),
+        target_date=BASE_RULE_DATE,
         technician_id=technician.technician_id,
         service_id=service.service_id,
         location_id=location.location_id,
@@ -186,8 +189,8 @@ async def test_custom_quota_limit_enforced_without_global_flag(db_session):
         booked_by_user_id=user.user_id,
         offering_id=offering.offering_id,
         technician_id=technician.technician_id,
-        start_time=datetime(2024, 5, 20, 9, 0, tzinfo=tz),
-        end_time=datetime(2024, 5, 20, 10, 0, tzinfo=tz),
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+        end_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 10, 0, tzinfo=tz),
         status=AppointmentStatus.SCHEDULED,
         booked_by_role=UserRole.CUSTOMER,
         price_at_booking=Decimal("128.00"),
@@ -196,7 +199,7 @@ async def test_custom_quota_limit_enforced_without_global_flag(db_session):
     await db_session.commit()
 
     request = AvailabilityRequest(
-        target_date=date(2024, 5, 20),
+        target_date=BASE_RULE_DATE,
         technician_id=technician.technician_id,
         service_id=service.service_id,
         location_id=location.location_id,
@@ -218,7 +221,7 @@ async def test_afternoon_quota_only_blocks_afternoon(db_session):
             select(BusinessHour).where(
                 BusinessHour.technician_id == technician.technician_id,
                 BusinessHour.location_id == location.location_id,
-                BusinessHour.day_of_week == 0,
+                BusinessHour.rule_date == BASE_RULE_DATE,
             )
         )
     ).scalar_one()
@@ -234,8 +237,8 @@ async def test_afternoon_quota_only_blocks_afternoon(db_session):
         booked_by_user_id=user.user_id,
         offering_id=offering.offering_id,
         technician_id=technician.technician_id,
-        start_time=datetime(2024, 5, 20, 13, 0, tzinfo=tz),
-        end_time=datetime(2024, 5, 20, 14, 0, tzinfo=tz),
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 13, 0, tzinfo=tz),
+        end_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 14, 0, tzinfo=tz),
         status=AppointmentStatus.SCHEDULED,
         booked_by_role=UserRole.CUSTOMER,
         price_at_booking=Decimal("128.00"),
@@ -244,7 +247,7 @@ async def test_afternoon_quota_only_blocks_afternoon(db_session):
     await db_session.commit()
 
     request = AvailabilityRequest(
-        target_date=date(2024, 5, 20),
+        target_date=BASE_RULE_DATE,
         technician_id=technician.technician_id,
         service_id=service.service_id,
         location_id=location.location_id,
@@ -272,8 +275,8 @@ async def test_zero_quota_disables_restriction(monkeypatch, db_session):
         booked_by_user_id=user.user_id,
         offering_id=offering.offering_id,
         technician_id=technician.technician_id,
-        start_time=datetime(2024, 5, 20, 9, 0, tzinfo=tz),
-        end_time=datetime(2024, 5, 20, 10, 0, tzinfo=tz),
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+        end_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 10, 0, tzinfo=tz),
         status=AppointmentStatus.SCHEDULED,
         booked_by_role=UserRole.CUSTOMER,
         price_at_booking=Decimal("128.00"),
@@ -285,7 +288,7 @@ async def test_zero_quota_disables_restriction(monkeypatch, db_session):
     monkeypatch.setattr(settings, "father_customer_afternoon_quota", 1)
 
     request = AvailabilityRequest(
-        target_date=date(2024, 5, 20),
+        target_date=BASE_RULE_DATE,
         technician_id=technician.technician_id,
         service_id=service.service_id,
         location_id=location.location_id,

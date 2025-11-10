@@ -26,26 +26,23 @@ class _BusinessHourBase(BaseModel):
                 raise ValueError(f"{prefix.upper()} slot requires both start and end")
             if start and end and start >= end:
                 raise ValueError(f"{prefix.upper()} slot start_time must be before end_time")
-        if not any(
-            (
-                self.start_time_am,
-                self.end_time_am,
-                self.start_time_pm,
-                self.end_time_pm,
-            )
-        ):
-            raise ValueError("At least one slot (AM or PM) must be provided")
         return self
 
 
 class BusinessHourCreate(_BusinessHourBase):
     technician_id: str
     location_id: str
-    day_of_week: int = Field(..., ge=0, le=6)
+    rule_date: date
+
+    @model_validator(mode="after")
+    def ensure_slot_exists(self) -> "BusinessHourCreate":
+        if not any((self.start_time_am, self.end_time_am, self.start_time_pm, self.end_time_pm)):
+            raise ValueError("At least one slot (AM or PM) must be provided")
+        return self
 
 
 class BusinessHourUpdate(_BusinessHourBase):
-    day_of_week: int | None = Field(None, ge=0, le=6)
+    rule_date: date | None = None
 
     @model_validator(mode="after")
     def allow_partial(self) -> "BusinessHourUpdate":
@@ -67,6 +64,7 @@ class BusinessHourPublic(BusinessHourCreate):
     model_config = ConfigDict(from_attributes=True)
 
     rule_id: str
+    day_of_week: int
 
 
 class ScheduleExceptionCreate(BaseModel):

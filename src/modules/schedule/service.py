@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, tzinfo
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -128,14 +128,16 @@ async def _get_offering(request: AvailabilityRequest, db: AsyncSession) -> Offer
 
 
 async def _get_business_hours(request: AvailabilityRequest, db: AsyncSession) -> list[BusinessHour]:
-    stmt = (
-        select(BusinessHour)
-        .where(
-            BusinessHour.technician_id == request.technician_id,
-            BusinessHour.location_id == request.location_id,
-            BusinessHour.day_of_week == request.target_date.weekday(),
-        )
-        .order_by(BusinessHour.day_of_week)
+    stmt = select(BusinessHour).where(
+        BusinessHour.technician_id == request.technician_id,
+        BusinessHour.location_id == request.location_id,
+        or_(
+            BusinessHour.rule_date == request.target_date,
+            and_(
+                BusinessHour.rule_date.is_(None),
+                BusinessHour.day_of_week == request.target_date.weekday(),
+            ),
+        ),
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())

@@ -98,7 +98,7 @@ async def test_admin_schedule_crud(admin_client):
         {
             "technician_id": technician_id,
             "location_id": location_id,
-            "day_of_week": 1,
+            "rule_date": "2024-05-21",
             "start_time_am": "09:00:00",
             "end_time_am": "12:00:00",
         }
@@ -115,6 +115,7 @@ async def test_admin_schedule_crud(admin_client):
     body = update_resp.json()
     assert body["start_time_pm"] == "14:00:00"
     assert body["end_time_pm"] == "18:00:00"
+    assert body["rule_date"] == "2024-05-21"
 
     exception_resp = await client.post(
         "/api/v1/admin/schedule/exceptions",
