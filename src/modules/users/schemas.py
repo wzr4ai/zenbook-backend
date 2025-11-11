@@ -8,12 +8,12 @@ from src.shared.enums import UserRole
 
 
 class UserPublic(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     user_id: str = Field(serialization_alias="id")
     role: UserRole
-    display_name: str | None = None
-    phone_number: str | None = None
+    display_name: str | None = Field(default=None, serialization_alias="name")
+    phone_number: str | None = Field(default=None, serialization_alias="phone")
 
 
 class UserUpdate(BaseModel):

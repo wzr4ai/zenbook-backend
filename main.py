@@ -12,6 +12,7 @@ from src.modules.catalog.admin_router import router as admin_catalog_router
 from src.modules.schedule.router import router as schedule_router
 from src.modules.schedule.admin_router import router as admin_schedule_router
 from src.modules.users.router import router as users_router
+from src.modules.users.admin_router import router as admin_users_router
 
 
 def create_app() -> FastAPI:
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_appointments_router)
     app.include_router(admin_catalog_router)
     app.include_router(admin_schedule_router)
+    app.include_router(admin_users_router)
 
     return app
 
