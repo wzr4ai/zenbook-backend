@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field
 
 from src.shared.enums import UserRole
 
@@ -12,8 +12,16 @@ class UserPublic(BaseModel):
 
     user_id: str = Field(serialization_alias="id")
     role: UserRole
-    display_name: str | None = Field(default=None, serialization_alias="name")
-    phone_number: str | None = Field(default=None, serialization_alias="phone")
+    display_name: str | None = None
+    phone_number: str | None = None
+
+    @computed_field(return_type=str | None, alias="name")
+    def name(self) -> str | None:
+        return self.display_name
+
+    @computed_field(return_type=str | None, alias="phone")
+    def phone(self) -> str | None:
+        return self.phone_number
 
 
 class UserUpdate(BaseModel):
