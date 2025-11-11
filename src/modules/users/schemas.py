@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from src.shared.enums import UserRole
 
@@ -21,10 +21,23 @@ class UserUpdate(BaseModel):
 
 
 class PatientBase(BaseModel):
-    full_name: str
-    phone_number: str | None = None
+    model_config = ConfigDict(populate_by_name=True)
+
+    full_name: str = Field(
+        validation_alias=AliasChoices("name", "full_name"),
+        serialization_alias="name",
+    )
+    phone_number: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("phone", "phone_number"),
+        serialization_alias="phone",
+    )
     birth_date: str | None = None
-    notes: str | None = None
+    notes: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("relation", "notes"),
+        serialization_alias="relation",
+    )
 
 
 class PatientCreate(PatientBase):
@@ -32,14 +45,28 @@ class PatientCreate(PatientBase):
 
 
 class PatientUpdate(BaseModel):
-    full_name: str | None = None
-    phone_number: str | None = None
+    model_config = ConfigDict(populate_by_name=True)
+
+    full_name: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("name", "full_name"),
+        serialization_alias="name",
+    )
+    phone_number: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("phone", "phone_number"),
+        serialization_alias="phone",
+    )
     birth_date: str | None = None
-    notes: str | None = None
+    notes: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("relation", "notes"),
+        serialization_alias="relation",
+    )
 
 
 class PatientPublic(PatientBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     patient_id: str = Field(serialization_alias="id")
     managed_by_user_id: str
