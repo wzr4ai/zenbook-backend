@@ -22,7 +22,11 @@ WEEKDAY_VALUES = "'monday','tuesday','wednesday','thursday','friday','saturday',
 
 
 def upgrade() -> None:
-    op.drop_constraint("ck_business_hours_dow", "business_hours", type_="check")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_checks = {check["name"] for check in inspector.get_check_constraints("business_hours")}
+    if "ck_business_hours_dow" in existing_checks:
+        op.drop_constraint("ck_business_hours_dow", "business_hours", type_="check")
 
     op.execute(
         f"""
@@ -42,7 +46,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_business_hours_weekday", "business_hours", type_="check")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_checks = {check["name"] for check in inspector.get_check_constraints("business_hours")}
+    if "ck_business_hours_weekday" in existing_checks:
+        op.drop_constraint("ck_business_hours_weekday", "business_hours", type_="check")
 
     op.execute(
         f"""
