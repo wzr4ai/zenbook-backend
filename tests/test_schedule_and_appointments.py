@@ -14,7 +14,7 @@ from src.modules.catalog.models import Location, Offering, Service
 from src.modules.schedule.models import BusinessHour
 from src.modules.schedule.service import AvailabilityRequest, get_availability
 from src.modules.users.models import Patient, Technician, User
-from src.shared.enums import AppointmentStatus, UserRole
+from src.shared.enums import AppointmentStatus, UserRole, Weekday
 from src.shared.ulid import generate_ulid
 
 BASE_RULE_DATE = date(2024, 5, 20)
@@ -43,7 +43,7 @@ async def _seed_common_catalog(db_session):
         rule_id=generate_ulid(),
         technician_id=technician.technician_id,
         location_id=location.location_id,
-        day_of_week=BASE_RULE_DATE.weekday(),
+        day_of_week=Weekday.from_date(BASE_RULE_DATE).value,
         rule_date=BASE_RULE_DATE,
         start_time_am=time(9, 0),
         end_time_am=time(12, 0),

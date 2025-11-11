@@ -19,6 +19,7 @@ from src.modules.schedule.schemas import (
     ScheduleExceptionUpdate,
 )
 from src.modules.users.models import User
+from src.shared.enums import Weekday
 
 router = APIRouter(prefix="/api/v1/admin/schedule", tags=["admin-schedule"])
 
@@ -111,7 +112,7 @@ async def create_business_hours(
     for item in payload:
         await _ensure_unique_date(db, item.technician_id, item.location_id, item.rule_date)
         data = item.model_dump()
-        data["day_of_week"] = item.rule_date.weekday()
+        data["day_of_week"] = Weekday.from_date(item.rule_date).value
         record = BusinessHour(**data)
         _validate_record(record)
         await _ensure_no_cross_location_overlap(db, record)
@@ -149,7 +150,7 @@ async def update_business_hour(
             update_data["rule_date"],
             exclude_rule_id=rule.rule_id,
         )
-        update_data["day_of_week"] = update_data["rule_date"].weekday()
+        update_data["day_of_week"] = Weekday.from_date(update_data["rule_date"]).value
     for field, value in update_data.items():
         setattr(rule, field, value)
     _validate_record(rule)

@@ -16,7 +16,7 @@ from src.modules.catalog.models import Offering, Service
 from src.modules.schedule.models import BusinessHour, ScheduleException
 from src.modules.schedule.schemas import AvailabilitySlot
 from src.modules.users.models import Technician
-from src.shared.enums import AppointmentStatus, UserRole
+from src.shared.enums import AppointmentStatus, UserRole, Weekday
 
 
 @dataclass
@@ -128,6 +128,7 @@ async def _get_offering(request: AvailabilityRequest, db: AsyncSession) -> Offer
 
 
 async def _get_business_hours(request: AvailabilityRequest, db: AsyncSession) -> list[BusinessHour]:
+    weekday_value = Weekday.from_date(request.target_date).value
     stmt = select(BusinessHour).where(
         BusinessHour.technician_id == request.technician_id,
         BusinessHour.location_id == request.location_id,
@@ -135,7 +136,7 @@ async def _get_business_hours(request: AvailabilityRequest, db: AsyncSession) ->
             BusinessHour.rule_date == request.target_date,
             and_(
                 BusinessHour.rule_date.is_(None),
-                BusinessHour.day_of_week == request.target_date.weekday(),
+                BusinessHour.day_of_week == weekday_value,
             ),
         ),
     )

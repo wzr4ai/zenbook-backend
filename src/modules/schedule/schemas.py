@@ -4,6 +4,8 @@ from datetime import date, datetime, time
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from src.shared.enums import Weekday
+
 
 class AvailabilitySlot(BaseModel):
     start: datetime
@@ -64,7 +66,7 @@ class BusinessHourPublic(BusinessHourCreate):
     model_config = ConfigDict(from_attributes=True)
 
     rule_id: str
-    day_of_week: int
+    day_of_week: Weekday
 
 
 class ScheduleExceptionCreate(BaseModel):
