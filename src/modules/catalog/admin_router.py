@@ -101,7 +101,7 @@ async def list_services(
     _: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> list[ServicePublic]:
-    result = await db.execute(select(Service).order_by(Service.created_at))
+    result = await db.execute(select(Service).order_by(Service.weight.desc(), Service.created_at))
     return list(result.scalars().all())
 
 

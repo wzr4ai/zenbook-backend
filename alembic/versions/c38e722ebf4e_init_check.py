@@ -23,19 +23,6 @@ appointment_status = sa.Enum("scheduled", "completed", "no_show", name="appointm
 
 def upgrade() -> None:
     op.create_table(
-        "users",
-        sa.Column("user_id", sa.String(length=26), primary_key=True),
-        sa.Column("wechat_openid", sa.String(length=64), nullable=False),
-        sa.Column("role", user_role, nullable=False, server_default="customer"),
-        sa.Column("display_name", sa.String(length=100)),
-        sa.Column("phone_number", sa.String(length=32)),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-    )
-    op.create_index("ix_users_wechat_openid", "users", ["wechat_openid"], unique=True)
-
-    op.create_table(
         "locations",
         sa.Column("location_id", sa.String(length=26), primary_key=True),
         sa.Column("name", sa.String(length=120), nullable=False),
@@ -47,6 +34,21 @@ def upgrade() -> None:
     )
 
     op.create_table(
+        "users",
+        sa.Column("user_id", sa.String(length=26), primary_key=True),
+        sa.Column("wechat_openid", sa.String(length=64), nullable=False),
+        sa.Column("role", user_role, nullable=False, server_default="customer"),
+        sa.Column("display_name", sa.String(length=100)),
+        sa.Column("phone_number", sa.String(length=32)),
+        sa.Column("default_location_id", sa.String(length=26), sa.ForeignKey("locations.location_id", ondelete="SET NULL")),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+    op.create_index("ix_users_wechat_openid", "users", ["wechat_openid"], unique=True)
+    op.create_index("ix_users_default_location_id", "users", ["default_location_id"])
+
+    op.create_table(
         "services",
         sa.Column("service_id", sa.String(length=26), primary_key=True),
         sa.Column("name", sa.String(length=120), nullable=False, unique=True),
@@ -54,6 +56,7 @@ def upgrade() -> None:
         sa.Column("default_duration_minutes", sa.Integer(), nullable=False, server_default="60"),
         sa.Column("concurrency_level", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column("weight", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
@@ -158,7 +161,8 @@ def downgrade() -> None:
     op.drop_table("technicians")
     op.drop_table("patients")
     op.drop_table("services")
-    op.drop_table("locations")
+    op.drop_index("ix_users_default_location_id", table_name="users")
     op.drop_table("users")
+    op.drop_table("locations")
     appointment_status.drop(op.get_bind(), checkfirst=False)
     user_role.drop(op.get_bind(), checkfirst=False)

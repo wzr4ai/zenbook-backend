@@ -20,7 +20,9 @@ async def list_locations(db: AsyncSession = Depends(get_db)) -> list[Location]:
 
 @router.get("/services", response_model=list[ServicePublic])
 async def list_services(db: AsyncSession = Depends(get_db)) -> list[Service]:
-    result = await db.execute(select(Service).where(Service.is_active.is_(True)).order_by(Service.name))
+    result = await db.execute(
+        select(Service).where(Service.is_active.is_(True)).order_by(Service.weight.desc(), Service.name)
+    )
     return list(result.scalars().all())
 
 

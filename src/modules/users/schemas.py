@@ -14,6 +14,7 @@ class UserPublic(BaseModel):
     role: UserRole
     display_name: str | None = None
     phone_number: str | None = None
+    default_location_id: str | None = None
 
     @computed_field(return_type=str | None, alias="name")
     def name(self) -> str | None:

@@ -327,6 +327,26 @@ async def test_customer_can_delete_future_appointment(monkeypatch, db_session):
 
 
 @pytest.mark.asyncio
+async def test_booking_updates_user_default_location(db_session):
+    tz = ZoneInfo("Asia/Shanghai")
+    technician, location, service, offering = await _seed_common_catalog(db_session)
+    user = User(user_id=generate_ulid(), wechat_openid="wx-pref", role=UserRole.CUSTOMER, is_active=True)
+    patient = Patient(patient_id=generate_ulid(), managed_by_user_id=user.user_id, full_name="Pref Test")
+    db_session.add_all([user, patient])
+    await db_session.commit()
+
+    service_layer = AppointmentService(db_session)
+    payload = AppointmentCreate(
+        offering_id=offering.offering_id,
+        patient_id=patient.patient_id,
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+    )
+    await service_layer.create_customer(payload, user)
+    await db_session.refresh(user)
+    assert user.default_location_id == location.location_id
+
+
+@pytest.mark.asyncio
 async def test_customer_cannot_delete_after_start(monkeypatch, db_session):
     tz = ZoneInfo("Asia/Shanghai")
     technician, location, service, offering = await _seed_common_catalog(db_session)

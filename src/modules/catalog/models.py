@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
@@ -39,6 +39,7 @@ class Service(Base, TimestampMixin):
     default_duration_minutes: Mapped[int] = mapped_column(default=60, nullable=False)
     concurrency_level: Mapped[int] = mapped_column(default=1, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    weight: Mapped[int] = mapped_column(default=0, nullable=False)
 
     offerings: Mapped[list["Offering"]] = relationship(back_populates="service")
 

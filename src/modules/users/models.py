@@ -40,6 +40,12 @@ class User(Base, TimestampMixin):
     display_name: Mapped[str | None] = mapped_column(String(100))
     phone_number: Mapped[str | None] = mapped_column(String(32))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    default_location_id: Mapped[str | None] = mapped_column(
+        String(26),
+        ForeignKey("locations.location_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     patients: Mapped[list[Patient]] = relationship(back_populates="manager")
     technician_profile: Mapped[Technician | None] = relationship(back_populates="user", uselist=False)

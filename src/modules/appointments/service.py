@@ -46,6 +46,8 @@ class AppointmentService:
             booked_by_role=UserRole.CUSTOMER,
         )
         self.db.add(appointment)
+        if user.default_location_id != offering.location_id:
+            user.default_location_id = offering.location_id
         await self.db.commit()
         await self.db.refresh(appointment)
         return appointment
