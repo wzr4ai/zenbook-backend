@@ -13,7 +13,7 @@ from src.shared.ulid import generate_ulid
 
 if TYPE_CHECKING:  # pragma: no cover
     from src.modules.appointments.models import Appointment
-    from src.modules.schedule.models import BusinessHour, ScheduleException
+    from src.modules.schedule.models import BusinessHour
     from src.modules.users.models import Technician
 
 
@@ -28,7 +28,6 @@ class Location(Base, TimestampMixin):
 
     offerings: Mapped[list["Offering"]] = relationship(back_populates="location")
     business_hours: Mapped[list["BusinessHour"]] = relationship(back_populates="location")
-    exceptions: Mapped[list["ScheduleException"]] = relationship(back_populates="location")
 
 
 class Service(Base, TimestampMixin):

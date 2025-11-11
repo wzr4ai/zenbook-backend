@@ -68,25 +68,3 @@ class BusinessHourPublic(BusinessHourCreate):
     rule_id: str
     day_of_week: Weekday
 
-
-class ScheduleExceptionCreate(BaseModel):
-    technician_id: str
-    location_id: str
-    date: date
-    is_available: bool = False
-    start_time: time | None = None
-    end_time: time | None = None
-    reason: str | None = None
-
-
-class ScheduleExceptionUpdate(BaseModel):
-    is_available: bool | None = None
-    start_time: time | None = None
-    end_time: time | None = None
-    reason: str | None = None
-
-
-class ScheduleExceptionPublic(ScheduleExceptionCreate):
-    model_config = ConfigDict(from_attributes=True)
-
-    exception_id: str

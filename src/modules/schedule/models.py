@@ -50,30 +50,3 @@ class BusinessHour(Base, TimestampMixin):
 
     technician: Mapped["Technician"] = relationship(back_populates="business_hours")
     location: Mapped["Location"] = relationship(back_populates="business_hours")
-
-
-class ScheduleException(Base, TimestampMixin):
-    __tablename__ = "schedule_exceptions"
-    __table_args__ = (
-        UniqueConstraint("technician_id", "location_id", "date", name="uq_schedule_exception"),
-    )
-
-    exception_id: Mapped[str] = mapped_column(String(26), primary_key=True, default=generate_ulid)
-    technician_id: Mapped[str] = mapped_column(
-        String(26),
-        ForeignKey("technicians.technician_id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    location_id: Mapped[str] = mapped_column(
-        String(26),
-        ForeignKey("locations.location_id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    date: Mapped[date] = mapped_column(Date, nullable=False)
-    is_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    start_time: Mapped[time | None] = mapped_column(Time(timezone=True))
-    end_time: Mapped[time | None] = mapped_column(Time(timezone=True))
-    reason: Mapped[str | None] = mapped_column(String(255))
-
-    technician: Mapped["Technician"] = relationship(back_populates="exceptions")
-    location: Mapped["Location"] = relationship(back_populates="exceptions")

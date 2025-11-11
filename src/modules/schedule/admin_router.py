@@ -9,15 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.deps import require_admin
-from src.modules.schedule.models import BusinessHour, ScheduleException
-from src.modules.schedule.schemas import (
-    BusinessHourCreate,
-    BusinessHourPublic,
-    BusinessHourUpdate,
-    ScheduleExceptionCreate,
-    ScheduleExceptionPublic,
-    ScheduleExceptionUpdate,
-)
+from src.modules.schedule.models import BusinessHour
+from src.modules.schedule.schemas import BusinessHourCreate, BusinessHourPublic, BusinessHourUpdate
 from src.modules.users.models import User
 from src.shared.enums import Weekday
 
@@ -170,62 +163,3 @@ async def delete_business_hour(
     await db.delete(rule)
     await db.commit()
 
-
-@router.post("/exceptions", response_model=ScheduleExceptionPublic, status_code=status.HTTP_201_CREATED)
-async def create_exception(
-    payload: ScheduleExceptionCreate,
-    _: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-) -> ScheduleExceptionPublic:
-    record = ScheduleException(**payload.model_dump())
-    db.add(record)
-    await db.commit()
-    await db.refresh(record)
-    return ScheduleExceptionPublic.model_validate(record)
-
-
-@router.get("/exceptions", response_model=list[ScheduleExceptionPublic])
-async def list_exceptions(
-    _: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-) -> list[ScheduleExceptionPublic]:
-    result = await db.execute(select(ScheduleException))
-    return [ScheduleExceptionPublic.model_validate(row) for row in result.scalars().all()]
-
-
-@router.put("/exceptions/{exception_id}", response_model=ScheduleExceptionPublic)
-async def update_exception(
-    exception_id: str,
-    payload: ScheduleExceptionUpdate,
-    _: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-) -> ScheduleExceptionPublic:
-    exception = await _get_schedule_entity(
-        db,
-        ScheduleException,
-        ScheduleException.exception_id,
-        exception_id,
-        "Schedule exception not found",
-    )
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(exception, field, value)
-    await db.commit()
-    await db.refresh(exception)
-    return ScheduleExceptionPublic.model_validate(exception)
-
-
-@router.delete("/exceptions/{exception_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_exception(
-    exception_id: str,
-    _: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-) -> None:
-    exception = await _get_schedule_entity(
-        db,
-        ScheduleException,
-        ScheduleException.exception_id,
-        exception_id,
-        "Schedule exception not found",
-    )
-    await db.delete(exception)
-    await db.commit()

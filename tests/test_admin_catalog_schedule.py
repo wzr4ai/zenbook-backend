@@ -116,29 +116,3 @@ async def test_admin_schedule_crud(admin_client):
     assert body["start_time_pm"] == "14:00:00"
     assert body["end_time_pm"] == "18:00:00"
     assert body["rule_date"] == "2024-05-21"
-
-    exception_resp = await client.post(
-        "/api/v1/admin/schedule/exceptions",
-        json={
-            "technician_id": technician_id,
-            "location_id": location_id,
-            "date": "2024-05-20",
-            "is_available": False,
-            "start_time": "10:00:00",
-            "end_time": "11:00:00",
-            "reason": "break",
-        },
-    )
-    exception_resp.raise_for_status()
-    exception_id = exception_resp.json()["exception_id"]
-
-    exception_update = await client.put(
-        f"/api/v1/admin/schedule/exceptions/{exception_id}",
-        json={"reason": "off-site"},
-    )
-    exception_update.raise_for_status()
-    assert exception_update.json()["reason"] == "off-site"
-
-    list_resp = await client.get("/api/v1/admin/schedule/exceptions")
-    assert list_resp.status_code == 200
-    assert any(item["exception_id"] == exception_id for item in list_resp.json())

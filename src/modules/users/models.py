@@ -15,7 +15,7 @@ from src.shared.ulid import generate_ulid
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from src.modules.appointments.models import Appointment
     from src.modules.catalog.models import Offering
-    from src.modules.schedule.models import BusinessHour, ScheduleException
+    from src.modules.schedule.models import BusinessHour
 
 
 class User(Base, TimestampMixin):
@@ -83,11 +83,10 @@ class Technician(Base, TimestampMixin):
     user: Mapped[User | None] = relationship(back_populates="technician_profile")
     offerings: Mapped[list[Offering]] = relationship(back_populates="technician")
     business_hours: Mapped[list[BusinessHour]] = relationship(back_populates="technician")
-    exceptions: Mapped[list[ScheduleException]] = relationship(back_populates="technician")
     appointments: Mapped[list[Appointment]] = relationship(back_populates="technician")
 
 
 # Late imports for type-checking relationship targets.
 from src.modules.appointments.models import Appointment  # noqa: E402
 from src.modules.catalog.models import Offering  # noqa: E402
-from src.modules.schedule.models import BusinessHour, ScheduleException  # noqa: E402
+from src.modules.schedule.models import BusinessHour  # noqa: E402

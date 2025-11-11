@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from src.core.config import settings
 from src.modules.appointments.models import Appointment
 from src.modules.catalog.models import Offering, Service
-from src.modules.schedule.models import BusinessHour, ScheduleException
+from src.modules.schedule.models import BusinessHour
 from src.modules.schedule.schemas import AvailabilitySlot
 from src.modules.users.models import Technician
 from src.shared.enums import AppointmentStatus, UserRole, Weekday
@@ -49,10 +49,7 @@ async def get_availability(request: AvailabilityRequest, db: AsyncSession) -> li
 
     duration = timedelta(minutes=offering.duration_minutes)
     business_hours = await _get_business_hours(request, db)
-    exception = await _get_exception(request, db)
-
     slots = _build_slots_from_rules(business_hours, request.target_date, duration, tz)
-    slots = _apply_exception(slots, exception, request.target_date, duration, tz)
 
     if blocked_morning or blocked_afternoon:
         noon = day_start.replace(hour=12, minute=0, second=0, microsecond=0)
@@ -144,16 +141,6 @@ async def _get_business_hours(request: AvailabilityRequest, db: AsyncSession) ->
     return list(result.scalars().all())
 
 
-async def _get_exception(request: AvailabilityRequest, db: AsyncSession) -> ScheduleException | None:
-    stmt = select(ScheduleException).where(
-        ScheduleException.technician_id == request.technician_id,
-        ScheduleException.location_id == request.location_id,
-        ScheduleException.date == request.target_date,
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
-
-
 def _combine(dt_date: date, value: time, tz: ZoneInfo) -> datetime:
     combined = datetime.combine(dt_date, value.replace(tzinfo=None))
     if value.tzinfo:
@@ -187,35 +174,6 @@ def _generate_slots(start: datetime, end: datetime, duration: timedelta) -> list
         slots.append((cursor, cursor + duration))
         cursor += duration
     return slots
-
-
-def _apply_exception(
-    slots: list[tuple[datetime, datetime]],
-    exception: ScheduleException | None,
-    target_date: date,
-    duration: timedelta,
-    tz: ZoneInfo,
-) -> list[tuple[datetime, datetime]]:
-    if exception is None:
-        return sorted(slots, key=lambda s: s[0])
-
-    exc_start = _combine(target_date, exception.start_time, tz) if exception.start_time else None
-    exc_end = _combine(target_date, exception.end_time, tz) if exception.end_time else None
-
-    if not exception.is_available:
-        if exc_start and exc_end:
-            slots = [slot for slot in slots if not _overlaps(slot, (exc_start, exc_end))]
-            return sorted(slots, key=lambda s: s[0])
-        return []
-
-    if exc_start and exc_end:
-        extra = _generate_slots(exc_start, exc_end, duration)
-        slots.extend(extra)
-    return sorted({slot[0]: slot for slot in slots}.values(), key=lambda s: s[0])
-
-
-def _overlaps(a: tuple[datetime, datetime], b: tuple[datetime, datetime]) -> bool:
-    return a[0] < b[1] and b[0] < a[1]
 
 
 async def _get_appointments_for_day(
