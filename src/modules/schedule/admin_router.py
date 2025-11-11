@@ -1,6 +1,7 @@
 """Admin schedule management routes."""
 
-from datetime import date
+from datetime import date, time
+from typing import Iterable
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -41,6 +42,47 @@ async def _ensure_unique_date(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Business hour already defined for this date")
 
 
+def _collect_intervals(record: BusinessHour) -> list[tuple[time, time]]:
+    intervals: list[tuple[time, time]] = []
+    for prefix in ("am", "pm"):
+        start = getattr(record, f"start_time_{prefix}")
+        end = getattr(record, f"end_time_{prefix}")
+        if start and end:
+            intervals.append((start, end))
+    return intervals
+
+
+def _has_overlap(intervals_a: Iterable[tuple[time, time]], intervals_b: Iterable[tuple[time, time]]) -> bool:
+    for start_a, end_a in intervals_a:
+        for start_b, end_b in intervals_b:
+            if max(start_a, start_b) < min(end_a, end_b):
+                return True
+    return False
+
+
+async def _ensure_no_cross_location_overlap(
+    db: AsyncSession,
+    candidate: BusinessHour,
+    exclude_rule_id: str | None = None,
+) -> None:
+    stmt = select(BusinessHour).where(
+        BusinessHour.technician_id == candidate.technician_id,
+        BusinessHour.rule_date == candidate.rule_date,
+    )
+    if exclude_rule_id:
+        stmt = stmt.where(BusinessHour.rule_id != exclude_rule_id)
+    existing_rules = (await db.execute(stmt)).scalars().all()
+    candidate_intervals = _collect_intervals(candidate)
+    if not candidate_intervals:
+        return
+    for rule in existing_rules:
+        if rule.location_id == candidate.location_id:
+            continue
+        if _has_overlap(candidate_intervals, _collect_intervals(rule)):
+            message = "Technician already scheduled for an overlapping slot at another location"
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=message)
+
+
 def _validate_record(record: BusinessHour) -> None:
     has_am = bool(record.start_time_am and record.end_time_am)
     has_pm = bool(record.start_time_pm and record.end_time_pm)
@@ -72,6 +114,7 @@ async def create_business_hours(
         data["day_of_week"] = item.rule_date.weekday()
         record = BusinessHour(**data)
         _validate_record(record)
+        await _ensure_no_cross_location_overlap(db, record)
         db.add(record)
         records.append(record)
     await db.commit()
@@ -110,6 +153,7 @@ async def update_business_hour(
     for field, value in update_data.items():
         setattr(rule, field, value)
     _validate_record(rule)
+    await _ensure_no_cross_location_overlap(db, rule, exclude_rule_id=rule.rule_id)
     await db.commit()
     await db.refresh(rule)
     return BusinessHourPublic.model_validate(rule)
