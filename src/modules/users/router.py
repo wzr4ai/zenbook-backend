@@ -8,13 +8,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.core.deps import get_current_user, require_customer
 from src.modules.users.models import Patient, User
-from src.modules.users.schemas import PatientCreate, PatientPublic, PatientUpdate, UserPublic
+from src.modules.users.schemas import PatientCreate, PatientPublic, PatientUpdate, UserPublic, UserUpdate
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
 
 @router.get("/me", response_model=UserPublic)
 async def get_me(current_user: User = Depends(get_current_user)) -> User:
+    return current_user
+
+
+@router.patch("/me", response_model=UserPublic)
+async def update_me(
+    payload: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    update_data = payload.model_dump(exclude_unset=True)
+    if "display_name" in update_data:
+        value = update_data["display_name"]
+        if value is not None:
+            cleaned = value.strip()
+            if not cleaned:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="display_name cannot be empty")
+            update_data["display_name"] = cleaned
+        setattr(current_user, "display_name", update_data["display_name"])
+    if not update_data:
+        return current_user
+    await db.commit()
+    await db.refresh(current_user)
     return current_user
 
 
