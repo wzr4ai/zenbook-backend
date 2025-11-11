@@ -39,13 +39,13 @@ async def create_appointment(
     return await service.create_customer(payload, current_user)
 
 
-@router.post("/{appointment_id}/cancel", response_model=AppointmentPublic)
-async def cancel_appointment(
+@router.delete("/{appointment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_appointment(
     appointment_id: str,
     current_user: User = Depends(require_customer),
     service: AppointmentService = Depends(get_service),
-) -> AppointmentPublic:
-    return await service.cancel_for_user(appointment_id, current_user)
+) -> None:
+    await service.delete_for_user(appointment_id, current_user)
 
 
 @admin_router.get("", response_model=list[AppointmentPublic])

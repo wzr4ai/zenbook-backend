@@ -18,7 +18,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 user_role = sa.Enum("customer", "technician", "admin", name="userrole")
-appointment_status = sa.Enum("scheduled", "completed", "cancelled", name="appointmentstatus")
+appointment_status = sa.Enum("scheduled", "completed", "no_show", name="appointmentstatus")
 
 
 def upgrade() -> None:

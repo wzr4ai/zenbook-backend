@@ -23,7 +23,7 @@ class UserRole(StrEnum):
 class AppointmentStatus(StrEnum):
     SCHEDULED = "scheduled"
     COMPLETED = "completed"
-    CANCELLED = "cancelled"
+    NO_SHOW = "no_show"
 
 
 class Weekday(StrEnum):

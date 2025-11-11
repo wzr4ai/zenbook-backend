@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from src.core.config import settings
 from src.modules.appointments.models import Appointment
-from src.modules.appointments.schemas import AppointmentCreate
+from src.modules.appointments.schemas import AppointmentCreate, AppointmentUpdate
 from src.modules.appointments.service import AppointmentService
 from src.modules.catalog.models import Location, Offering, Service
 from src.modules.schedule.models import BusinessHour
@@ -296,3 +296,98 @@ async def test_zero_quota_disables_restriction(monkeypatch, db_session):
     )
     slots = await get_availability(request, db_session)
     assert len(slots) >= 1
+
+
+@pytest.mark.asyncio
+async def test_customer_can_delete_future_appointment(monkeypatch, db_session):
+    tz = ZoneInfo("Asia/Shanghai")
+    technician, location, service, offering = await _seed_common_catalog(db_session)
+    user = User(user_id=generate_ulid(), wechat_openid="wx-delete", role=UserRole.CUSTOMER, is_active=True)
+    patient = Patient(patient_id=generate_ulid(), managed_by_user_id=user.user_id, full_name="Delete Me")
+    db_session.add_all([user, patient])
+    await db_session.commit()
+
+    service_layer = AppointmentService(db_session)
+    payload = AppointmentCreate(
+        offering_id=offering.offering_id,
+        patient_id=patient.patient_id,
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+    )
+    created = await service_layer.create_customer(payload, user)
+
+    monkeypatch.setattr(
+        AppointmentService,
+        "_now",
+        lambda self: datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 8, 0, tzinfo=tz),
+    )
+    await service_layer.delete_for_user(created.appointment_id, user)
+
+    result = await db_session.execute(select(Appointment).where(Appointment.appointment_id == created.appointment_id))
+    assert result.scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_customer_cannot_delete_after_start(monkeypatch, db_session):
+    tz = ZoneInfo("Asia/Shanghai")
+    technician, location, service, offering = await _seed_common_catalog(db_session)
+    user = User(user_id=generate_ulid(), wechat_openid="wx-late", role=UserRole.CUSTOMER, is_active=True)
+    patient = Patient(patient_id=generate_ulid(), managed_by_user_id=user.user_id, full_name="Late Delete")
+    db_session.add_all([user, patient])
+    await db_session.commit()
+
+    service_layer = AppointmentService(db_session)
+    payload = AppointmentCreate(
+        offering_id=offering.offering_id,
+        patient_id=patient.patient_id,
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+    )
+    created = await service_layer.create_customer(payload, user)
+
+    monkeypatch.setattr(
+        AppointmentService,
+        "_now",
+        lambda self: datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 10, 0, tzinfo=tz),
+    )
+    with pytest.raises(HTTPException) as exc:
+        await service_layer.delete_for_user(created.appointment_id, user)
+    assert exc.value.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_admin_can_mark_status_after_start(monkeypatch, db_session):
+    tz = ZoneInfo("Asia/Shanghai")
+    technician, location, service, offering = await _seed_common_catalog(db_session)
+    user = User(user_id=generate_ulid(), wechat_openid="wx-done", role=UserRole.CUSTOMER, is_active=True)
+    patient = Patient(patient_id=generate_ulid(), managed_by_user_id=user.user_id, full_name="Finish Test")
+    db_session.add_all([user, patient])
+    await db_session.commit()
+
+    service_layer = AppointmentService(db_session)
+    payload = AppointmentCreate(
+        offering_id=offering.offering_id,
+        patient_id=patient.patient_id,
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+    )
+    created = await service_layer.create_customer(payload, user)
+
+    monkeypatch.setattr(
+        AppointmentService,
+        "_now",
+        lambda self: datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 8, 30, tzinfo=tz),
+    )
+    with pytest.raises(HTTPException):
+        await service_layer.admin_update(
+            created.appointment_id,
+            AppointmentUpdate(status=AppointmentStatus.COMPLETED),
+        )
+
+    monkeypatch.setattr(
+        AppointmentService,
+        "_now",
+        lambda self: datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 10, 0, tzinfo=tz),
+    )
+    updated = await service_layer.admin_update(
+        created.appointment_id,
+        AppointmentUpdate(status=AppointmentStatus.NO_SHOW),
+    )
+    assert updated.status == AppointmentStatus.NO_SHOW

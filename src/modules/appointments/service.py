@@ -24,6 +24,9 @@ class AppointmentService:
         self.db = db
         self.tz = ZoneInfo(settings.default_timezone)
 
+    def _now(self) -> datetime:
+        return datetime.now(tz=self.tz)
+
     async def create_customer(self, payload: AppointmentCreate, user: User) -> Appointment:
         patient = await self._get_patient(payload.patient_id, owner_id=user.user_id)
         offering = await self._get_offering(payload.offering_id)
@@ -58,14 +61,12 @@ class AppointmentService:
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def cancel_for_user(self, appointment_id: str, user: User) -> Appointment:
+    async def delete_for_user(self, appointment_id: str, user: User) -> None:
         appointment = await self._get_user_appointment(appointment_id, user)
-        if appointment.status != AppointmentStatus.SCHEDULED:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Appointment not cancellable")
-        appointment.status = AppointmentStatus.CANCELLED
+        if appointment.start_time <= self._now():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Appointment already started")
+        await self.db.delete(appointment)
         await self.db.commit()
-        await self.db.refresh(appointment)
-        return appointment
 
     async def admin_list(self) -> list[Appointment]:
         stmt = select(Appointment).order_by(Appointment.start_time.desc())
@@ -117,7 +118,15 @@ class AppointmentService:
             appointment.end_time = new_end
 
         if "status" in update_data:
-            appointment.status = update_data["status"]
+            new_status: AppointmentStatus = update_data["status"]
+            if appointment.start_time > self._now():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot update status before appointment time",
+                )
+            if new_status not in {AppointmentStatus.COMPLETED, AppointmentStatus.NO_SHOW}:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported status update")
+            appointment.status = new_status
         if "notes" in update_data:
             appointment.notes = update_data["notes"]
 
