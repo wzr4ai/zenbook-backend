@@ -29,6 +29,7 @@ def upgrade() -> None:
     #op.add_column("services", sa.Column("weight", sa.Integer(), nullable=False, server_default="0"))
     #op.execute("UPDATE services SET weight = 0 WHERE weight IS NULL")
     #op.alter_column("services", "weight", server_default=None)
+    pass
 
 
 def downgrade() -> None:
@@ -37,3 +38,4 @@ def downgrade() -> None:
     #op.drop_constraint("fk_users_default_location", "users", type_="foreignkey")
     #op.drop_index("ix_users_default_location_id", table_name="users")
     #op.drop_column("users", "default_location_id")
+    pass
