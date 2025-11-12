@@ -65,7 +65,7 @@ class AppointmentService:
 
     async def delete_for_user(self, appointment_id: str, user: User) -> None:
         appointment = await self._get_user_appointment(appointment_id, user)
-        if appointment.start_time <= self._now():
+        if self._localize(appointment.start_time) <= self._now():
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Appointment already started")
         await self.db.delete(appointment)
         await self.db.commit()
@@ -121,7 +121,7 @@ class AppointmentService:
 
         if "status" in update_data:
             new_status: AppointmentStatus = update_data["status"]
-            if appointment.start_time > self._now():
+            if self._localize(appointment.start_time) > self._now():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Cannot update status before appointment time",
@@ -193,6 +193,11 @@ class AppointmentService:
     def _normalize_datetime(self, value: datetime) -> datetime:
         if value.tzinfo is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Datetime must be timezone-aware")
+        return value.astimezone(self.tz)
+
+    def _localize(self, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=self.tz)
         return value.astimezone(self.tz)
 
     async def _ensure_customer_slot(self, offering: Offering, start: datetime, duration: timedelta) -> None:

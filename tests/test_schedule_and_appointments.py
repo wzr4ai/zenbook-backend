@@ -3,7 +3,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlalchemy import select
 
 from src.core.config import settings
@@ -90,6 +90,44 @@ async def test_availability_excludes_conflicting_appointments(db_session):
     slots = await get_availability(request, db_session)
     assert len(slots) == 2
     assert slots[0].start.hour == 10 and slots[0].end.hour == 11
+
+
+@pytest.mark.asyncio
+async def test_availability_respects_service_concurrency(db_session):
+    tz = ZoneInfo("Asia/Shanghai")
+    technician, location, service, offering = await _seed_common_catalog(db_session)
+    service.concurrency_level = 2
+    user = User(user_id=generate_ulid(), wechat_openid="wx-openid-2", role=UserRole.CUSTOMER, is_active=True)
+    patient = Patient(
+        patient_id=generate_ulid(),
+        managed_by_user_id=user.user_id,
+        full_name="Test Patient",
+    )
+    appointment = Appointment(
+        appointment_id=generate_ulid(),
+        patient_id=patient.patient_id,
+        booked_by_user_id=user.user_id,
+        offering_id=offering.offering_id,
+        technician_id=technician.technician_id,
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+        end_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 10, 0, tzinfo=tz),
+        status=AppointmentStatus.SCHEDULED,
+        booked_by_role=UserRole.CUSTOMER,
+        price_at_booking=Decimal("128.00"),
+    )
+    db_session.add_all([user, patient, appointment])
+    await db_session.commit()
+
+    request = AvailabilityRequest(
+        target_date=BASE_RULE_DATE,
+        technician_id=technician.technician_id,
+        service_id=service.service_id,
+        location_id=location.location_id,
+        requester_role=UserRole.CUSTOMER,
+    )
+    slots = await get_availability(request, db_session)
+    assert len(slots) == 3
+    assert slots[0].start.hour == 9 and slots[0].end.hour == 10
 
 
 @pytest.mark.asyncio

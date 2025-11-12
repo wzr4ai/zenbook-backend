@@ -238,3 +238,12 @@ def _filter_by_concurrency(
         if overlaps < concurrency_level:
             filtered.append((start, end))
     return filtered
+
+
+def _overlaps(
+    slot_a: tuple[datetime, datetime],
+    slot_b: tuple[datetime, datetime],
+) -> bool:
+    start_a, end_a = slot_a
+    start_b, end_b = slot_b
+    return start_a < end_b and end_a > start_b
