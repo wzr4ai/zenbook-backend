@@ -73,3 +73,40 @@ class Appointment(Base, TimestampMixin):
     booking_user: Mapped[User | None] = relationship()
     offering: Mapped[Offering] = relationship(back_populates="appointments")
     technician: Mapped[Technician] = relationship(back_populates="appointments")
+
+    @property
+    def patient_name(self) -> str | None:
+        patient = self.__dict__.get("patient")
+        if patient:
+            return getattr(patient, "full_name", None)
+        return None
+
+    @property
+    def service_name(self) -> str | None:
+        offering = self.__dict__.get("offering")
+        if offering:
+            service = offering.__dict__.get("service")
+            if service:
+                return getattr(service, "name", None)
+        return None
+
+    @property
+    def technician_name(self) -> str | None:
+        technician = self.__dict__.get("technician")
+        if technician:
+            return getattr(technician, "display_name", None)
+        offering = self.__dict__.get("offering")
+        if offering:
+            tech = offering.__dict__.get("technician")
+            if tech:
+                return getattr(tech, "display_name", None)
+        return None
+
+    @property
+    def location_name(self) -> str | None:
+        offering = self.__dict__.get("offering")
+        if offering:
+            location = offering.__dict__.get("location")
+            if location:
+                return getattr(location, "name", None)
+        return None

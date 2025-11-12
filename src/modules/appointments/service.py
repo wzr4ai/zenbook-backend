@@ -45,17 +45,28 @@ class AppointmentService:
             booked_by_user_id=user.user_id,
             booked_by_role=UserRole.CUSTOMER,
         )
+        appointment.patient = patient
+        appointment.offering = offering
+        appointment.technician = offering.technician
         self.db.add(appointment)
         if user.default_location_id != offering.location_id:
             user.default_location_id = offering.location_id
         await self.db.commit()
         await self.db.refresh(appointment)
+        appointment.patient = patient
+        appointment.offering = offering
+        appointment.technician = offering.technician
         return appointment
 
     async def list_for_user(self, user: User) -> list[Appointment]:
         stmt = (
             select(Appointment)
-            .options(selectinload(Appointment.offering))
+            .options(
+                selectinload(Appointment.patient),
+                selectinload(Appointment.technician),
+                selectinload(Appointment.offering).selectinload(Offering.service),
+                selectinload(Appointment.offering).selectinload(Offering.location),
+            )
             .join(Patient)
             .where(Patient.managed_by_user_id == user.user_id)
             .order_by(Appointment.start_time.desc())
@@ -71,7 +82,16 @@ class AppointmentService:
         await self.db.commit()
 
     async def admin_list(self) -> list[Appointment]:
-        stmt = select(Appointment).order_by(Appointment.start_time.desc())
+        stmt = (
+            select(Appointment)
+            .options(
+                selectinload(Appointment.patient),
+                selectinload(Appointment.technician),
+                selectinload(Appointment.offering).selectinload(Offering.service),
+                selectinload(Appointment.offering).selectinload(Offering.location),
+            )
+            .order_by(Appointment.start_time.desc())
+        )
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
@@ -95,9 +115,15 @@ class AppointmentService:
             booked_by_user_id=user.user_id,
             booked_by_role=user.role,
         )
+        appointment.patient = patient
+        appointment.offering = offering
+        appointment.technician = offering.technician
         self.db.add(appointment)
         await self.db.commit()
         await self.db.refresh(appointment)
+        appointment.patient = patient
+        appointment.offering = offering
+        appointment.technician = offering.technician
         return appointment
 
     async def admin_update(self, appointment_id: str, payload: AppointmentUpdate) -> Appointment:
@@ -133,8 +159,7 @@ class AppointmentService:
             appointment.notes = update_data["notes"]
 
         await self.db.commit()
-        await self.db.refresh(appointment)
-        return appointment
+        return await self._get_by_id(appointment.appointment_id)
 
     async def admin_delete(self, appointment_id: str) -> None:
         appointment = await self._get_by_id(appointment_id)
@@ -154,7 +179,11 @@ class AppointmentService:
     async def _get_offering(self, offering_id: str) -> Offering:
         stmt = (
             select(Offering)
-            .options(selectinload(Offering.service), selectinload(Offering.technician))
+            .options(
+                selectinload(Offering.service),
+                selectinload(Offering.technician),
+                selectinload(Offering.location),
+            )
             .where(Offering.offering_id == offering_id)
         )
         result = await self.db.execute(stmt)
@@ -166,6 +195,12 @@ class AppointmentService:
     async def _get_user_appointment(self, appointment_id: str, user: User) -> Appointment:
         stmt = (
             select(Appointment)
+            .options(
+                selectinload(Appointment.patient),
+                selectinload(Appointment.technician),
+                selectinload(Appointment.offering).selectinload(Offering.service),
+                selectinload(Appointment.offering).selectinload(Offering.location),
+            )
             .join(Patient)
             .where(
                 Appointment.appointment_id == appointment_id,
@@ -179,10 +214,15 @@ class AppointmentService:
         return appointment
 
     async def _get_by_id(self, appointment_id: str) -> Appointment:
-        stmt = select(Appointment).options(
-            selectinload(Appointment.offering).selectinload(Offering.service)
-        ).where(
-            Appointment.appointment_id == appointment_id
+        stmt = (
+            select(Appointment)
+            .options(
+                selectinload(Appointment.patient),
+                selectinload(Appointment.technician),
+                selectinload(Appointment.offering).selectinload(Offering.service),
+                selectinload(Appointment.offering).selectinload(Offering.location),
+            )
+            .where(Appointment.appointment_id == appointment_id)
         )
         result = await self.db.execute(stmt)
         appointment = result.scalar_one_or_none()

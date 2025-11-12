@@ -159,6 +159,36 @@ async def test_customer_booking_requires_free_slot(db_session):
 
 
 @pytest.mark.asyncio
+async def test_list_for_user_includes_related_names(db_session):
+    tz = ZoneInfo("Asia/Shanghai")
+    technician, location, service, offering = await _seed_common_catalog(db_session)
+    user = User(user_id=generate_ulid(), wechat_openid="wx-names", role=UserRole.CUSTOMER, is_active=True)
+    patient = Patient(
+        patient_id=generate_ulid(),
+        managed_by_user_id=user.user_id,
+        full_name="Display Target",
+    )
+    db_session.add_all([user, patient])
+    await db_session.commit()
+
+    service_layer = AppointmentService(db_session)
+    payload = AppointmentCreate(
+        offering_id=offering.offering_id,
+        patient_id=patient.patient_id,
+        start_time=datetime(BASE_RULE_DATE.year, BASE_RULE_DATE.month, BASE_RULE_DATE.day, 9, 0, tzinfo=tz),
+    )
+    await service_layer.create_customer(payload, user)
+
+    items = await service_layer.list_for_user(user)
+    assert len(items) == 1
+    record = items[0]
+    assert record.patient_name == patient.full_name
+    assert record.service_name == service.name
+    assert record.technician_name == technician.display_name
+    assert record.location_name == location.name
+
+
+@pytest.mark.asyncio
 async def test_father_quota_blocks_customer_but_not_admin(monkeypatch, db_session):
     tz = ZoneInfo("Asia/Shanghai")
     technician, location, service, offering = await _seed_common_catalog(db_session)

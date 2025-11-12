@@ -13,6 +13,7 @@ class AppointmentPublic(BaseModel):
 
     appointment_id: str = Field(serialization_alias="id")
     patient_id: str
+    patient_name: str | None = None
     offering_id: str
     technician_id: str
     start_time: datetime
@@ -21,6 +22,9 @@ class AppointmentPublic(BaseModel):
     booked_by_role: UserRole
     price_at_booking: Decimal
     notes: str | None = None
+    service_name: str | None = None
+    technician_name: str | None = None
+    location_name: str | None = None
 
 
 class AppointmentCreate(BaseModel):
