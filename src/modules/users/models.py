@@ -85,6 +85,7 @@ class Technician(Base, TimestampMixin):
     restricted_by_quota: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     morning_quota_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     afternoon_quota_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    weight: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     user: Mapped[User | None] = relationship(back_populates="technician_profile")
     offerings: Mapped[list[Offering]] = relationship(back_populates="technician")

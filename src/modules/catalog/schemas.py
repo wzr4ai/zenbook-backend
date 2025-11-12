@@ -71,6 +71,7 @@ class TechnicianPublic(BaseModel):
     restricted_by_quota: bool
     morning_quota_limit: int | None = Field(default=None, ge=0)
     afternoon_quota_limit: int | None = Field(default=None, ge=0)
+    weight: int = Field(default=0, ge=0)
 
 
 class TechnicianCreate(BaseModel):
@@ -82,6 +83,7 @@ class TechnicianCreate(BaseModel):
     restricted_by_quota: bool = False
     morning_quota_limit: int | None = Field(default=None, ge=0)
     afternoon_quota_limit: int | None = Field(default=None, ge=0)
+    weight: int = Field(default=0, ge=0)
 
 
 class TechnicianUpdate(BaseModel):
@@ -93,6 +95,7 @@ class TechnicianUpdate(BaseModel):
     restricted_by_quota: bool | None = None
     morning_quota_limit: int | None = Field(default=None, ge=0)
     afternoon_quota_limit: int | None = Field(default=None, ge=0)
+    weight: int | None = Field(default=None, ge=0)
 
 
 class OfferingPublic(BaseModel):

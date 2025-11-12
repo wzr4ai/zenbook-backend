@@ -149,7 +149,9 @@ async def list_technicians(
     _: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> list[TechnicianPublic]:
-    result = await db.execute(select(Technician).order_by(Technician.created_at))
+    result = await db.execute(
+        select(Technician).order_by(Technician.weight.desc(), Technician.created_at)
+    )
     return list(result.scalars().all())
 
 

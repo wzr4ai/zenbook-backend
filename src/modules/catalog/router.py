@@ -28,7 +28,11 @@ async def list_services(db: AsyncSession = Depends(get_db)) -> list[Service]:
 
 @router.get("/technicians", response_model=list[TechnicianPublic])
 async def list_technicians(db: AsyncSession = Depends(get_db)) -> list[Technician]:
-    result = await db.execute(select(Technician).where(Technician.is_active.is_(True)).order_by(Technician.display_name))
+    result = await db.execute(
+        select(Technician)
+        .where(Technician.is_active.is_(True))
+        .order_by(Technician.weight.desc(), Technician.display_name)
+    )
     return list(result.scalars().all())
 
 
