@@ -18,6 +18,9 @@ from src.modules.schedule.schemas import AvailabilitySlot
 from src.modules.users.models import Technician
 from src.shared.enums import AppointmentStatus, UserRole, Weekday
 
+UNAVAILABLE_REASON_CONFLICT = "已被预约"
+UNAVAILABLE_REASON_QUOTA = "客户配额已满"
+
 
 @dataclass
 class AvailabilityRequest:
@@ -49,21 +52,21 @@ async def get_availability(request: AvailabilityRequest, db: AsyncSession) -> li
 
     duration = timedelta(minutes=offering.duration_minutes)
     business_hours = await _get_business_hours(request, db)
-    slots = _build_slots_from_rules(business_hours, request.target_date, duration, tz)
-
-    if blocked_morning or blocked_afternoon:
-        noon = day_start.replace(hour=12, minute=0, second=0, microsecond=0)
-        if blocked_morning:
-            slots = [slot for slot in slots if slot[0] >= noon]
-        if blocked_afternoon:
-            slots = [slot for slot in slots if slot[0] < noon]
-
-    if not slots:
+    raw_slots = _build_slots_from_rules(business_hours, request.target_date, duration, tz)
+    if not raw_slots:
         return []
 
     appointments = await _get_appointments_for_day(technician.technician_id, day_start, day_end, db)
-    slots = _filter_by_concurrency(slots, appointments, service.concurrency_level)
-    return [AvailabilitySlot(start=start, end=end) for start, end in slots]
+    noon = day_start.replace(hour=12, minute=0, second=0, microsecond=0)
+    availability = _evaluate_slot_reasons(
+        raw_slots,
+        appointments,
+        service.concurrency_level,
+        blocked_morning,
+        blocked_afternoon,
+        noon,
+    )
+    return availability
 
 
 async def _quota_overages(
@@ -238,6 +241,34 @@ def _filter_by_concurrency(
         if overlaps < concurrency_level:
             filtered.append((start, end))
     return filtered
+
+
+def _evaluate_slot_reasons(
+    slots: list[tuple[datetime, datetime]],
+    appointments: list[Appointment],
+    concurrency_level: int,
+    blocked_morning: bool,
+    blocked_afternoon: bool,
+    noon: datetime,
+) -> list[AvailabilitySlot]:
+    quota_mask = [
+        (blocked_morning and start < noon) or (blocked_afternoon and start >= noon) for start, _ in slots
+    ]
+    unconstrained_slots = [slot for slot, masked in zip(slots, quota_mask) if not masked]
+    available_after_conflicts = _filter_by_concurrency(unconstrained_slots, appointments, concurrency_level)
+    available_set = {slot for slot in available_after_conflicts}
+
+    annotated: list[AvailabilitySlot] = []
+    for slot, masked in zip(slots, quota_mask):
+        start, end = slot
+        if masked:
+            reason = UNAVAILABLE_REASON_QUOTA
+        elif slot not in available_set:
+            reason = UNAVAILABLE_REASON_CONFLICT
+        else:
+            reason = None
+        annotated.append(AvailabilitySlot(start=start, end=end, reason=reason))
+    return annotated
 
 
 def _overlaps(

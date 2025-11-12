@@ -12,7 +12,12 @@ from src.modules.appointments.schemas import AppointmentCreate, AppointmentUpdat
 from src.modules.appointments.service import AppointmentService
 from src.modules.catalog.models import Location, Offering, Service
 from src.modules.schedule.models import BusinessHour
-from src.modules.schedule.service import AvailabilityRequest, get_availability
+from src.modules.schedule.service import (
+    UNAVAILABLE_REASON_CONFLICT,
+    UNAVAILABLE_REASON_QUOTA,
+    AvailabilityRequest,
+    get_availability,
+)
 from src.modules.users.models import Patient, Technician, User
 from src.shared.enums import AppointmentStatus, UserRole, Weekday
 from src.shared.ulid import generate_ulid
@@ -88,8 +93,9 @@ async def test_availability_excludes_conflicting_appointments(db_session):
         requester_role=UserRole.CUSTOMER,
     )
     slots = await get_availability(request, db_session)
-    assert len(slots) == 2
-    assert slots[0].start.hour == 10 and slots[0].end.hour == 11
+    assert len(slots) == 3
+    assert slots[0].start.hour == 9 and slots[0].reason == UNAVAILABLE_REASON_CONFLICT
+    assert slots[1].reason is None
 
 
 @pytest.mark.asyncio
@@ -127,7 +133,7 @@ async def test_availability_respects_service_concurrency(db_session):
     )
     slots = await get_availability(request, db_session)
     assert len(slots) == 3
-    assert slots[0].start.hour == 9 and slots[0].end.hour == 10
+    assert slots[0].start.hour == 9 and all(slot.reason is None for slot in slots)
 
 
 @pytest.mark.asyncio
@@ -226,7 +232,8 @@ async def test_father_quota_blocks_customer_but_not_admin(monkeypatch, db_sessio
         requester_role=UserRole.CUSTOMER,
     )
     customer_slots = await get_availability(base_request, db_session)
-    assert customer_slots == []
+    assert customer_slots
+    assert all(slot.reason == UNAVAILABLE_REASON_QUOTA for slot in customer_slots)
 
     admin_slots = await get_availability(
         AvailabilityRequest(
@@ -239,6 +246,8 @@ async def test_father_quota_blocks_customer_but_not_admin(monkeypatch, db_sessio
         db_session,
     )
     assert len(admin_slots) >= 1
+    assert any(slot.reason is None for slot in admin_slots)
+    assert any(slot.reason == UNAVAILABLE_REASON_CONFLICT for slot in admin_slots)
 
 
 @pytest.mark.asyncio
@@ -274,7 +283,8 @@ async def test_custom_quota_limit_enforced_without_global_flag(db_session):
         requester_role=UserRole.CUSTOMER,
     )
     slots = await get_availability(request, db_session)
-    assert slots == []
+    assert slots
+    assert all(slot.reason == UNAVAILABLE_REASON_QUOTA for slot in slots)
 
 
 @pytest.mark.asyncio
@@ -323,7 +333,11 @@ async def test_afternoon_quota_only_blocks_afternoon(db_session):
     )
     slots = await get_availability(request, db_session)
     assert len(slots) >= 1
-    assert all(slot.start.hour < 12 for slot in slots)
+    morning_slots = [slot for slot in slots if slot.start.hour < 12]
+    afternoon_slots = [slot for slot in slots if slot.start.hour >= 12]
+    assert morning_slots and afternoon_slots
+    assert all(slot.reason is None for slot in morning_slots)
+    assert all(slot.reason == UNAVAILABLE_REASON_QUOTA for slot in afternoon_slots)
 
 
 @pytest.mark.asyncio
@@ -364,6 +378,7 @@ async def test_zero_quota_disables_restriction(monkeypatch, db_session):
     )
     slots = await get_availability(request, db_session)
     assert len(slots) >= 1
+    assert any(slot.reason is None for slot in slots)
 
 
 @pytest.mark.asyncio

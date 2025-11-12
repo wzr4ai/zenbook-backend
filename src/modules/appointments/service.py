@@ -251,7 +251,7 @@ class AppointmentService:
         slots = await get_availability(request, self.db)
         target_end = start + duration
         for slot in slots:
-            if slot.start == start and slot.end == target_end:
+            if slot.reason is None and slot.start == start and slot.end == target_end:
                 return
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Requested slot unavailable")
 
