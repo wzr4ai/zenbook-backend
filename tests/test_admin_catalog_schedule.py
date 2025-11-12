@@ -82,6 +82,26 @@ async def test_admin_catalog_crud(admin_client):
     assert list_resp.status_code == 200
     assert any(item["id"] == offering_id for item in list_resp.json())
 
+    filtered_resp = await client.get(
+        "/api/v1/catalog/offerings",
+        params={
+            "technician_id": technician_id,
+            "service_id": service_id,
+            "location_id": location_id,
+        },
+    )
+    filtered_resp.raise_for_status()
+    filtered_body = filtered_resp.json()
+    assert len(filtered_body) == 1
+    assert filtered_body[0]["id"] == offering_id
+
+    empty_resp = await client.get(
+        "/api/v1/catalog/offerings",
+        params={"technician_id": "NON_EXISTENT"},
+    )
+    empty_resp.raise_for_status()
+    assert empty_resp.json() == []
+
 
 @pytest.mark.asyncio
 async def test_admin_schedule_crud(admin_client):

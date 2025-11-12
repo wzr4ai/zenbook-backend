@@ -1,6 +1,6 @@
 """Catalog read-only routes for MVP."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,8 +33,19 @@ async def list_technicians(db: AsyncSession = Depends(get_db)) -> list[Technicia
 
 
 @router.get("/offerings", response_model=list[OfferingPublic])
-async def list_offerings(db: AsyncSession = Depends(get_db)) -> list[Offering]:
-    result = await db.execute(
-        select(Offering).where(Offering.is_available.is_(True)).order_by(Offering.updated_at.desc())
-    )
+async def list_offerings(
+    technician_id: str | None = Query(default=None),
+    service_id: str | None = Query(default=None),
+    location_id: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> list[Offering]:
+    stmt = select(Offering).where(Offering.is_available.is_(True))
+    if technician_id:
+        stmt = stmt.where(Offering.technician_id == technician_id)
+    if service_id:
+        stmt = stmt.where(Offering.service_id == service_id)
+    if location_id:
+        stmt = stmt.where(Offering.location_id == location_id)
+    stmt = stmt.order_by(Offering.updated_at.desc())
+    result = await db.execute(stmt)
     return list(result.scalars().all())
