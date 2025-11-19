@@ -12,6 +12,7 @@ from src.modules.users.models import User
 from src.shared.enums import UserRole
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+PHONE_OPENID_PREFIX = "phone:"
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -50,8 +51,9 @@ async def login_with_phone(payload: PhoneLoginRequest, db: AsyncSession = Depend
     result = await db.execute(select(User).where(User.phone_number == phone))
     user = result.scalar_one_or_none()
     if user is None:
+        phone_openid = f"{PHONE_OPENID_PREFIX}{phone}"
         user = User(
-            wechat_openid=None,
+            wechat_openid=phone_openid,
             role=UserRole.CUSTOMER,
             display_name=f"phone_{phone[-4:]}",
             phone_number=phone,
