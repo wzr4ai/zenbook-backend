@@ -26,7 +26,12 @@ class User(Base, TimestampMixin):
         primary_key=True,
         default=generate_ulid,
     )
-    wechat_openid: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    wechat_openid: Mapped[str | None] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
     role: Mapped[UserRole] = mapped_column(
         Enum(
             UserRole,

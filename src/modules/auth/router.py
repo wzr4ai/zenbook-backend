@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.security import create_access_token
-from src.modules.auth.schemas import LoginRequest, TokenResponse
+from src.modules.auth.schemas import LoginRequest, PhoneLoginRequest, TokenResponse
 from src.modules.auth.wechat import exchange_code_for_openid
 from src.modules.users.models import User
 from src.shared.enums import UserRole
@@ -35,6 +35,33 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> To
         await db.refresh(user)
     else:
         await db.commit()
+
+    token = create_access_token(user.user_id, user.role)
+    return TokenResponse(token=token, user_info=user)
+
+
+@router.post("/login/phone", response_model=TokenResponse)
+async def login_with_phone(payload: PhoneLoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+    """Create or fetch a user by phone number and issue a JWT."""
+    phone = payload.phone_number.strip()
+    if not phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid phone number")
+
+    result = await db.execute(select(User).where(User.phone_number == phone))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(
+            wechat_openid=None,
+            role=UserRole.CUSTOMER,
+            display_name=f"phone_{phone[-4:]}",
+            phone_number=phone,
+        )
+        db.add(user)
+    else:
+        if user.phone_number != phone:
+            user.phone_number = phone
+    await db.commit()
+    await db.refresh(user)
 
     token = create_access_token(user.user_id, user.role)
     return TokenResponse(token=token, user_info=user)
