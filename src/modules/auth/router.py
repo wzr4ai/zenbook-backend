@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.security import create_access_token
-from src.modules.auth.schemas import LoginRequest, PhoneLoginRequest, TokenResponse
-from src.modules.auth.wechat import exchange_code_for_openid
+from src.modules.auth.schemas import LoginRequest, PhoneLoginRequest, SmsCodeRequest, TokenResponse
+from src.modules.auth.sms import request_sms_code, validate_sms_code
 from src.modules.users.models import User
 from src.shared.enums import UserRole
 
@@ -41,12 +41,25 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)) -> To
     return TokenResponse(token=token, user_info=user)
 
 
+@router.post("/sms")
+async def send_sms_code(payload: SmsCodeRequest) -> dict[str, str]:
+    phone = payload.phone_number.strip()
+    if not phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid phone number")
+    request_sms_code(phone)
+    return {"status": "sent"}
+
+
 @router.post("/login/phone", response_model=TokenResponse)
 async def login_with_phone(payload: PhoneLoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     """Create or fetch a user by phone number and issue a JWT."""
     phone = payload.phone_number.strip()
     if not phone:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid phone number")
+    verification_code = payload.verification_code.strip()
+    if not verification_code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing verification code")
+    validate_sms_code(phone, verification_code)
 
     result = await db.execute(select(User).where(User.phone_number == phone))
     user = result.scalar_one_or_none()

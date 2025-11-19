@@ -16,12 +16,21 @@ class PhoneLoginRequest(BaseModel):
         validation_alias=AliasChoices("phone", "phone_number"),
         serialization_alias="phone",
     )
-    verification_code: str | None = Field(
-        default=None,
+    verification_code: str = Field(
+        ...,
         min_length=4,
         max_length=10,
         validation_alias=AliasChoices("code", "otp", "verification_code"),
         serialization_alias="code",
+    )
+
+
+class SmsCodeRequest(BaseModel):
+    phone_number: str = Field(
+        ...,
+        min_length=4,
+        validation_alias=AliasChoices("phone", "phone_number"),
+        serialization_alias="phone",
     )
 
 
