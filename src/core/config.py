@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     default_timezone: str = Field("Asia/Shanghai", alias="DEFAULT_TIMEZONE")
     father_customer_morning_quota: int = Field(2, alias="FATHER_CUSTOMER_MORNING_QUOTA")
     father_customer_afternoon_quota: int = Field(2, alias="FATHER_CUSTOMER_AFTERNOON_QUOTA")
+    cors_allowed_origins: list[str] = Field(
+        default_factory=lambda: ["*"],
+        alias="CORS_ALLOWED_ORIGINS",
+    )
 
 
 @lru_cache(1)

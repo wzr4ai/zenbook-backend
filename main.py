@@ -1,6 +1,7 @@
 """FastAPI application entrypoint."""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
 from src.core.exceptions import register_exception_handlers
@@ -22,6 +23,14 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
     register_exception_handlers(app)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allowed_origins or ["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/health", tags=["system"])
     async def health_check() -> dict[str, str]:
